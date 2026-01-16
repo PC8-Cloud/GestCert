@@ -1,0 +1,68 @@
+export enum Role {
+  ADMIN = 'Amministratore',
+  SECRETARY = 'Segreteria',
+}
+
+export enum UserStatus {
+  ACTIVE = 'Attivo',
+  SUSPENDED = 'Sospeso',
+  LOCKED = 'Bloccato',
+}
+
+export interface Certificate {
+  id: string;
+  name: string;
+  issueDate: string;
+  expiryDate: string;
+  fileUrl?: string;
+}
+
+export interface User {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string;
+  mobile?: string;
+  fiscalCode: string; // Codice Fiscale
+  gender: 'M' | 'F';
+  birthDate: string;
+  birthPlace: string;
+  nationality: string;
+  address: string;
+  zipCode: string;
+  city: string;
+  province: string;
+  group?: string;
+  notes?: string;
+  status: UserStatus;
+  certificates: Certificate[];
+}
+
+export interface Operator {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: Role;
+  status: UserStatus;
+  lastAccess?: string;
+}
+
+export interface AppSettings {
+  theme: 'light' | 'dark';
+  fontSize: 'small' | 'medium' | 'large';
+  widgets: {
+    welcome: boolean;
+    clock: boolean;
+    calendar: boolean;
+    expiry: boolean;
+  };
+  smtp?: {
+    server: string;
+    port: number;
+    encryption: 'NONE' | 'SSL' | 'TLS';
+    user: string;
+    senderEmail: string;
+  };
+}

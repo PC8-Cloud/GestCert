@@ -1,0 +1,5 @@
+{
+  "name": "GestCert - Cassa Edile Agrigentina",
+  "description": "Webapp per la gestione centralizzata degli utenti e dei certificati della Cassa Edile Agrigentina.",
+  "requestFramePermissions": []
+}
