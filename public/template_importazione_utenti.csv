@@ -1,0 +1,3 @@
+Cognome;Nome;Email;Codice Fiscale;Sesso;Data Nascita;Luogo Nascita;Paese Nascita;Nazionalita;Indirizzo;N. Civico;CAP;Citta;Provincia;Telefono;Cellulare;Gruppo;Note;Stato
+Rossi;Mario;mario.rossi@email.com;RSSMRA80A01H501U;M;1980-01-01;Roma;IT;IT;Via Roma;10;00100;Roma;RM;0612345678;3331234567;Gruppo A;;Attivo
+Bianchi;Anna;anna.bianchi@email.com;BNCNNA85B42F205X;F;1985-02-02;Milano;IT;IT;Via Milano;5/A;20100;Milano;MI;;3339876543;Gruppo B;Note esempio;Attivo

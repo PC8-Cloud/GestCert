@@ -1,29 +1,41 @@
 import React, { useState } from 'react';
 import { Logo } from '../components/Logo';
-import { User, Lock, ArrowRight } from 'lucide-react';
-import { Role } from '../types';
+import { User, Lock, ArrowRight, AlertCircle } from 'lucide-react';
+import { Operator } from '../types';
 
 interface LoginProps {
-  onLogin: (email: string, role: Role) => void;
+  onLogin: (email: string, password: string) => Promise<Operator | null>;
+  loading?: boolean;
+  error?: string | null;
 }
 
-const Login: React.FC<LoginProps> = ({ onLogin }) => {
+const Login: React.FC<LoginProps> = ({ onLogin, loading: externalLoading, error: externalError }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showForgot, setShowForgot] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const error = externalError || localError;
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    // Simulation of API call
-    setTimeout(() => {
-      // Mock logic: if email contains "admin" -> ADMIN, else SECRETARY
-      const role = email.toLowerCase().includes('admin') ? Role.ADMIN : Role.SECRETARY;
-      onLogin(email, role);
+    setLocalError(null);
+
+    try {
+      const operator = await onLogin(email, password);
+      if (!operator) {
+        setLocalError('Credenziali non valide o account non attivo');
+      }
+    } catch {
+      setLocalError('Errore durante il login');
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
+
+  const loading = isLoading || externalLoading;
 
   if (showForgot) {
     return (
@@ -82,6 +94,13 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           <p className="text-gray-300 text-center mb-8 text-sm">Accedi per gestire le anagrafiche e i certificati</p>
           
           <form onSubmit={handleSubmit} className="space-y-6">
+            {error && (
+              <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-3 flex items-center gap-2 text-red-200">
+                <AlertCircle size={18} />
+                <span className="text-sm">{error}</span>
+              </div>
+            )}
+
             <div className="relative group">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <User className="text-gray-300 group-focus-within:text-accent transition-colors" size={20} />
@@ -104,18 +123,17 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                required
                 className="w-full bg-black/20 border border-white/10 rounded-lg py-3 pl-10 pr-4 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
-                placeholder="Password"
+                placeholder="Password (opzionale per ora)"
               />
             </div>
 
             <button
               type="submit"
-              disabled={isLoading}
-              className="w-full bg-secondary hover:bg-accent text-white font-bold py-3 px-4 rounded-lg shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all flex items-center justify-center"
+              disabled={loading}
+              className="w-full bg-secondary hover:bg-accent text-white font-bold py-3 px-4 rounded-lg shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLoading ? (
+              {loading ? (
                 <span className="animate-pulse">Accesso in corso...</span>
               ) : (
                 <>

@@ -28,8 +28,10 @@ export interface User {
   gender: 'M' | 'F';
   birthDate: string;
   birthPlace: string;
+  birthCountry: string; // Paese di nascita (IT, DE, etc.)
   nationality: string;
   address: string;
+  houseNumber?: string; // Numero civico
   zipCode: string;
   city: string;
   province: string;
@@ -47,6 +49,7 @@ export interface Operator {
   role: Role;
   status: UserStatus;
   lastAccess?: string;
+  passwordHash?: string;
 }
 
 export interface AppSettings {
