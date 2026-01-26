@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS operators (
 CREATE TABLE IF NOT EXISTS settings (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   operator_id UUID REFERENCES operators(id) ON DELETE CASCADE,
+  operator_email TEXT,
   theme TEXT DEFAULT 'light',
   font_size TEXT DEFAULT 'medium',
   widgets JSONB DEFAULT '{"welcome": true, "clock": true, "calendar": true, "expiry": true}',
@@ -107,6 +108,7 @@ CREATE INDEX IF NOT EXISTS idx_certificates_user_id ON certificates(user_id);
 CREATE INDEX IF NOT EXISTS idx_certificates_expiry_date ON certificates(expiry_date);
 CREATE INDEX IF NOT EXISTS idx_operators_email ON operators(email);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_operators_auth_user_id ON operators(auth_user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_settings_operator_email ON settings(operator_email);
 
 -- Abilita Row Level Security
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
@@ -153,17 +155,25 @@ CREATE POLICY "Operators admin all" ON operators
 
 CREATE POLICY "Settings self access" ON settings
   FOR ALL USING (
-    EXISTS (
-      SELECT 1 FROM operators o
-      WHERE o.id = settings.operator_id
-        AND o.auth_user_id = auth.uid()
+    auth.role() = 'authenticated'
+    AND (
+      (settings.operator_email IS NOT NULL AND settings.operator_email = (auth.jwt() ->> 'email'))
+      OR EXISTS (
+        SELECT 1 FROM operators o
+        WHERE o.id = settings.operator_id
+          AND o.auth_user_id = auth.uid()
+      )
     )
   )
   WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM operators o
-      WHERE o.id = settings.operator_id
-        AND o.auth_user_id = auth.uid()
+    auth.role() = 'authenticated'
+    AND (
+      (settings.operator_email IS NOT NULL AND settings.operator_email = (auth.jwt() ->> 'email'))
+      OR EXISTS (
+        SELECT 1 FROM operators o
+        WHERE o.id = settings.operator_id
+          AND o.auth_user_id = auth.uid()
+      )
     )
   );
 

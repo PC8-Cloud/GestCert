@@ -176,14 +176,14 @@ export const usersService = {
             const normalized = base64ToDataUrl(fileUrl);
             if (normalized) fileUrl = normalized;
           }
-          if (fileUrl && isDataUrl(fileUrl)) {
-            const safeName = cert.name.replace(/[^a-zA-Z0-9àèéìòùÀÈÉÌÒÙ_-]/g, '_');
-            const ext = getExtensionFromDataUrl(fileUrl);
-            const path = `users/${data.id}/${Date.now()}_${safeName}.${ext}`;
-            await uploadDataUrlToStorage(STORAGE_BUCKET, path, fileUrl);
-            fileUrl = storageUrlFor(STORAGE_BUCKET, path);
+            if (fileUrl && isDataUrl(fileUrl)) {
+              const safeName = cert.name.replace(/[^a-zA-Z0-9àèéìòùÀÈÉÌÒÙ_-]/g, '_');
+              const ext = getExtensionFromDataUrl(fileUrl);
+              const path = `users/${data.id}/${Date.now()}_${safeName}.${ext}`;
+              const uploaded = await uploadDataUrlToStorage(STORAGE_BUCKET, path, fileUrl);
+              fileUrl = uploaded ? storageUrlFor(STORAGE_BUCKET, path) : null;
+            }
           }
-        }
         const { data: certData, error: certError } = await supabase
           .from('certificates')
           .insert({
@@ -293,8 +293,8 @@ export const usersService = {
             const safeName = cert.name.replace(/[^a-zA-Z0-9àèéìòùÀÈÉÌÒÙ_-]/g, '_');
             const ext = getExtensionFromDataUrl(fileUrl);
             const path = `users/${id}/${Date.now()}_${safeName}.${ext}`;
-            await uploadDataUrlToStorage(STORAGE_BUCKET, path, fileUrl);
-            fileUrl = storageUrlFor(STORAGE_BUCKET, path);
+            const uploaded = await uploadDataUrlToStorage(STORAGE_BUCKET, path, fileUrl);
+            fileUrl = uploaded ? storageUrlFor(STORAGE_BUCKET, path) : null;
           }
         }
 
@@ -337,8 +337,8 @@ export const usersService = {
             const safeName = cert.name.replace(/[^a-zA-Z0-9àèéìòùÀÈÉÌÒÙ_-]/g, '_');
             const ext = getExtensionFromDataUrl(fileUrl);
             const path = `users/${id}/${Date.now()}_${safeName}.${ext}`;
-            await uploadDataUrlToStorage(STORAGE_BUCKET, path, fileUrl);
-            fileUrl = storageUrlFor(STORAGE_BUCKET, path);
+            const uploaded = await uploadDataUrlToStorage(STORAGE_BUCKET, path, fileUrl);
+            fileUrl = uploaded ? storageUrlFor(STORAGE_BUCKET, path) : null;
           }
         }
         const { error: insertError } = await supabase
@@ -876,8 +876,8 @@ export const restoreService = {
               const safeName = cert.name.replace(/[^a-zA-Z0-9àèéìòùÀÈÉÌÒÙ_-]/g, '_');
               const ext = fileUrl.startsWith('data:application/pdf') ? 'pdf' : fileUrl.startsWith('data:image/png') ? 'png' : fileUrl.startsWith('data:image/jpeg') ? 'jpg' : 'bin';
               const path = `users/${newUser.id}/${Date.now()}_${safeName}.${ext}`;
-              await uploadDataUrlToStorage(STORAGE_BUCKET, path, fileUrl);
-              fileUrl = storageUrlFor(STORAGE_BUCKET, path);
+              const uploaded = await uploadDataUrlToStorage(STORAGE_BUCKET, path, fileUrl);
+              fileUrl = uploaded ? storageUrlFor(STORAGE_BUCKET, path) : null;
             }
 
             const certData = {

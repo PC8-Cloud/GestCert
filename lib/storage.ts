@@ -49,16 +49,16 @@ export async function uploadDataUrlToStorage(
   bucket: string,
   path: string,
   dataUrl: string
-): Promise<void> {
+): Promise<boolean> {
   // Ignora URL non-data (blob:, https://, etc.)
   if (!dataUrl.startsWith('data:')) {
     console.warn('[storage] Skipping non-data URL:', dataUrl.substring(0, 50));
-    return;
+    return false;
   }
   const parsed = dataUrlToBlob(dataUrl);
   if (!parsed) {
     console.warn('[storage] Could not parse data URL');
-    return; // Non lanciare errore, ignora silenziosamente
+    return false; // Non lanciare errore, ignora silenziosamente
   }
   const { blob, mimeType } = parsed;
   const { error } = await supabase.storage.from(bucket).upload(path, blob, {
@@ -66,6 +66,7 @@ export async function uploadDataUrlToStorage(
     contentType: mimeType
   });
   if (error) throw error;
+  return true;
 }
 
 export async function createSignedUrl(
