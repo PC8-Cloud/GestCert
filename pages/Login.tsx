@@ -123,8 +123,9 @@ const Login: React.FC<LoginProps> = ({ onLogin, loading: externalLoading, error:
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                required
                 className="w-full bg-black/20 border border-white/10 rounded-lg py-3 pl-10 pr-4 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
-                placeholder="Password (opzionale per ora)"
+                placeholder="Password"
               />
             </div>
 
@@ -154,7 +155,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, loading: externalLoading, error:
         </div>
         
         <div className="mt-8 text-center text-white/40 text-xs">
-          Prodotto e gestito da PC8 srl - Build 1.0
+          Prodotto e gestito da PC8 srl - Build 2.0
         </div>
       </div>
     </div>

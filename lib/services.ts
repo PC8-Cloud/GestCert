@@ -468,6 +468,17 @@ export const operatorsService = {
     return data ? mapDbOperatorToOperator(data) : null;
   },
 
+  async getByAuthUserId(authUserId: string): Promise<Operator | null> {
+    const { data, error } = await supabase
+      .from('operators')
+      .select('*')
+      .eq('auth_user_id', authUserId)
+      .single();
+
+    if (error && error.code !== 'PGRST116') throw error;
+    return data ? mapDbOperatorToOperator(data) : null;
+  },
+
   async create(operator: Omit<Operator, 'id'> & { password?: string; passwordHash?: string }): Promise<Operator> {
     let passwordHash = operator.passwordHash;
     if (!passwordHash && operator.password) {
@@ -536,12 +547,25 @@ export const operatorsService = {
 // ============ SETTINGS SERVICE ============
 
 export const settingsService = {
-  async get(operatorId: string): Promise<AppSettings | null> {
-    const { data, error } = await supabase
+  // In modalità hybrid, usiamo operator_email come identificatore
+  async get(operatorIdOrEmail: string): Promise<AppSettings | null> {
+    // Prova prima con operator_email (hybrid mode)
+    let { data, error } = await supabase
       .from('settings')
       .select('*')
-      .eq('operator_id', operatorId)
+      .eq('operator_email', operatorIdOrEmail)
       .single();
+
+    // Se non trova, prova con operator_id (retrocompatibilità)
+    if (error?.code === 'PGRST116') {
+      const result = await supabase
+        .from('settings')
+        .select('*')
+        .eq('operator_id', operatorIdOrEmail)
+        .single();
+      data = result.data;
+      error = result.error;
+    }
 
     if (error && error.code !== 'PGRST116') throw error;
 
@@ -555,18 +579,19 @@ export const settingsService = {
     };
   },
 
-  async upsert(operatorId: string, settings: AppSettings): Promise<void> {
+  async upsert(operatorIdOrEmail: string, settings: AppSettings): Promise<void> {
+    // Usa operator_email per hybrid mode
     const { error } = await supabase
       .from('settings')
       .upsert({
-        operator_id: operatorId,
+        operator_email: operatorIdOrEmail,
         theme: settings.theme,
         font_size: settings.fontSize,
         widgets: settings.widgets,
         smtp_config: settings.smtp,
         updated_at: new Date().toISOString()
       }, {
-        onConflict: 'operator_id'
+        onConflict: 'operator_email'
       });
 
     if (error) throw error;
@@ -596,13 +621,13 @@ export const bachecaService = {
     return (data || []).map(mapDbNotaToNota);
   },
 
-  async create(contenuto: string, operatoreId: string, operatoreNome: string): Promise<NotaBacheca> {
+  async create(contenuto: string, _operatoreId: string, operatoreNome: string): Promise<NotaBacheca> {
     const { data, error } = await supabase
       .from('bacheca')
       .insert({
         contenuto,
-        operatore_id: operatoreId,
         operatore_nome: operatoreNome
+        // operatore_id non usato in modalità hybrid (ID locale non valido su Supabase)
       })
       .select()
       .single();
@@ -718,7 +743,8 @@ function mapDbOperatorToOperator(dbOp: Record<string, unknown>): Operator {
     role: dbOp.role as Role,
     status: dbOp.status as UserStatus,
     lastAccess: dbOp.last_access as string | undefined,
-    passwordHash: dbOp.password_hash as string | undefined
+    passwordHash: dbOp.password_hash as string | undefined,
+    authUserId: dbOp.auth_user_id as string | undefined
   };
 }
 
@@ -941,7 +967,8 @@ export const restoreServiceExtras = {
         role: op.role,
         status: op.status,
         last_access: op.lastAccess || null,
-        password_hash: op.passwordHash || null
+        password_hash: op.passwordHash || null,
+        auth_user_id: op.authUserId || null
       });
     }
   },

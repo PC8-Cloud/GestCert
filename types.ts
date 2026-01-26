@@ -50,6 +50,7 @@ export interface Operator {
   status: UserStatus;
   lastAccess?: string;
   passwordHash?: string;
+  authUserId?: string;
 }
 
 export interface AppSettings {

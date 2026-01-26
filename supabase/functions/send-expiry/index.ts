@@ -159,6 +159,30 @@ Deno.serve(async (req) => {
       .filter((x) => x && x.daysUntilExpiry >= 0 && x.daysUntilExpiry <= maxDays);
 
     if (expiring.length === 0) {
+      // Se force=true, invia comunque una mail di test all'operatore
+      if (force && settings.operator_email) {
+        const transporter = nodemailer.createTransport({
+          host: smtp.host,
+          port: smtp.port,
+          secure: smtp.encryption === "SSL",
+          auth: { user: smtp.smtp_user, pass: smtp.smtp_password },
+          tls: smtp.encryption === "TLS" ? { rejectUnauthorized: false } : undefined,
+          connectionTimeout: 10000,
+          greetingTimeout: 10000,
+          socketTimeout: 10000
+        });
+
+        await transporter.sendMail({
+          from: `"${smtp.sender_name}" <${smtp.sender_email}>`,
+          to: settings.operator_email,
+          subject: "Test Notifiche GestCert",
+          text: "Questa è una mail di test dal sistema GestCert.\n\nLa configurazione SMTP e le notifiche funzionano correttamente.\n\nAttualmente non ci sono certificati in scadenza.",
+          replyTo: smtp.reply_to || undefined
+        });
+
+        return new Response(JSON.stringify({ message: "Email di test inviata (nessun certificato in scadenza)", sent: 1 }), { status: 200, headers: corsHeaders });
+      }
+
       if (settings.daily_digest && !force) {
         await supabase
           .from("notification_settings")

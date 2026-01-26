@@ -119,6 +119,16 @@ export const MOCK_OPERATORS: Operator[] = [
     passwordHash: 'e1396d0b25fb89fcf1e0b9360398b3edb8e48a9ae3e9b515ff98aa2f1c5a8116' // admin123
   },
   {
+    id: 'op0',
+    firstName: 'Super',
+    lastName: 'Admin',
+    email: 'admin@admin',
+    role: Role.ADMIN,
+    status: UserStatus.ACTIVE,
+    lastAccess: '2024-01-01 10:00:00',
+    passwordHash: '457d2c6858347ba5be8e34dad1be9350bfefcec9b3f445871219e0a9075cae02' // Uno23456!
+  },
+  {
     id: 'op2',
     firstName: 'Maria',
     lastName: 'Segreteria',

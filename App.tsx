@@ -14,7 +14,7 @@ const App: React.FC = () => {
   const auth = useAuth();
   const { users, setUsers, loading: usersLoading, createUser, updateUser, deleteUser, deleteUsers } = useUsers();
   const { operators, loading: operatorsLoading, createOperator, updateOperator, deleteOperator } = useOperators();
-  const { settings, setSettings } = useSettings(auth.currentOperator?.id || null);
+  const { settings, setSettings } = useSettings(auth.currentOperator?.email || null);
   const bacheca = useBacheca();
   const activities = useActivities();
 

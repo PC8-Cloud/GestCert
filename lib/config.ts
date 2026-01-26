@@ -1,11 +1,12 @@
 // ============ STORAGE CONFIGURATION ============
 // Imposta 'local' per usare localStorage (sviluppo/test)
 // Imposta 'supabase' per usare il database remoto (produzione)
+// Imposta 'hybrid' per login locale + dati da Supabase
 
-export type StorageMode = 'local' | 'supabase';
+export type StorageMode = 'local' | 'supabase' | 'hybrid';
 
 // CAMBIA QUESTO VALORE PER SWITCHARE TRA STORAGE LOCALE E REMOTO
-export const STORAGE_MODE: StorageMode = 'supabase';
+export const STORAGE_MODE: StorageMode = 'hybrid';
 
 // Supabase Storage bucket (for certificate files)
 export const STORAGE_BUCKET = 'GestCert';

@@ -162,6 +162,9 @@ export const localCertificatesService = {
 
 // ============ LOCAL OPERATORS SERVICE ============
 
+// Email dell'admin di sistema (non modificabile/eliminabile)
+const SYSTEM_ADMIN_EMAIL = 'admin@admin';
+
 export const localOperatorsService = {
   async getAll(): Promise<Operator[]> {
     const operators = getFromStorage<Operator[]>(LOCAL_STORAGE_KEYS.OPERATORS, MOCK_OPERATORS);
@@ -173,7 +176,20 @@ export const localOperatorsService = {
     return operators.find(o => o.email.toLowerCase() === email.toLowerCase()) || null;
   },
 
+  async getByAuthUserId(_authUserId: string): Promise<Operator | null> {
+    return null;
+  },
+
+  isSystemAdmin(operator: Operator | { email?: string }): boolean {
+    return operator.email?.toLowerCase() === SYSTEM_ADMIN_EMAIL.toLowerCase();
+  },
+
   async create(operator: Omit<Operator, 'id'> & { password?: string }): Promise<Operator> {
+    // Non permettere di creare un altro admin@admin
+    if (operator.email?.toLowerCase() === SYSTEM_ADMIN_EMAIL.toLowerCase()) {
+      throw new Error('Non è possibile creare un operatore con questa email');
+    }
+
     const operators = await this.getAll();
 
     // Hash della password se fornita
@@ -200,6 +216,16 @@ export const localOperatorsService = {
     const index = operators.findIndex(o => o.id === id);
     if (index === -1) throw new Error('Operatore non trovato');
 
+    // Blocca modifiche all'admin di sistema (eccetto lastAccess e passwordHash)
+    if (operators[index].email?.toLowerCase() === SYSTEM_ADMIN_EMAIL.toLowerCase()) {
+      // Permetti solo aggiornamento password e lastAccess
+      const allowedFields = ['password', 'passwordHash', 'lastAccess'];
+      const attemptedFields = Object.keys(operatorData).filter(k => !allowedFields.includes(k));
+      if (attemptedFields.length > 0) {
+        throw new Error('L\'operatore di sistema non può essere modificato');
+      }
+    }
+
     let passwordHash = operatorData.passwordHash;
     if (!passwordHash && operatorData.password) {
       passwordHash = await hashPassword(operatorData.password);
@@ -221,9 +247,16 @@ export const localOperatorsService = {
   },
 
   async delete(id: string): Promise<void> {
-    let operators = await this.getAll();
-    operators = operators.filter(o => o.id !== id);
-    saveToStorage(LOCAL_STORAGE_KEYS.OPERATORS, operators);
+    const operators = await this.getAll();
+    const toDelete = operators.find(o => o.id === id);
+
+    // Blocca eliminazione admin di sistema
+    if (toDelete?.email?.toLowerCase() === SYSTEM_ADMIN_EMAIL.toLowerCase()) {
+      throw new Error('L\'operatore di sistema non può essere eliminato');
+    }
+
+    const filtered = operators.filter(o => o.id !== id);
+    saveToStorage(LOCAL_STORAGE_KEYS.OPERATORS, filtered);
   }
 };
 

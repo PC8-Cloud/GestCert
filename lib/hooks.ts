@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { User, Operator, AppSettings } from '../types';
 import { STORAGE_MODE } from './config';
 import { usersService, operatorsService, settingsService, bachecaService, NotaBacheca } from './services';
+import { supabase } from './supabase';
 import {
   localUsersService,
   localOperatorsService,
@@ -16,10 +17,11 @@ import {
 import { hashPassword, verifyPassword } from './password';
 
 // Seleziona i servizi in base alla modalita' di storage
+// In modalità 'hybrid': login locale + dati da Supabase
 const usersApi = STORAGE_MODE === 'local' ? localUsersService : usersService;
-const operatorsApi = STORAGE_MODE === 'local' ? localOperatorsService : operatorsService;
-const settingsApi = STORAGE_MODE === 'local' ? localSettingsService : settingsService;
-const bachecaApi = STORAGE_MODE === 'local' ? localBachecaService : bachecaService;
+const operatorsApi = STORAGE_MODE === 'supabase' ? operatorsService : localOperatorsService; // hybrid usa locale
+const settingsApi = STORAGE_MODE === 'local' ? localSettingsService : settingsService; // hybrid usa Supabase
+const bachecaApi = STORAGE_MODE === 'local' ? localBachecaService : bachecaService; // hybrid usa Supabase
 const activitiesApi = localActivitiesService; // Sempre locale per semplicità
 
 // ============ USERS HOOK ============
@@ -195,10 +197,12 @@ export function useAuth() {
     try {
       setLoading(true);
       setError(null);
+      console.log('[auth] login start', { email });
 
+      // Carica l'operatore per email
       const operator = await withTimeout(
         operatorsApi.getByEmail(email),
-        12000,
+        8000,
         'Timeout durante il login. Verifica la connessione o riprova.'
       );
 
@@ -212,40 +216,38 @@ export function useAuth() {
         return null;
       }
 
-      let resolvedOperator = operator;
-
-      // Verifica password o inizializza password hash se mancante
-      if (resolvedOperator.passwordHash) {
-        const isValid = await verifyPassword(password, resolvedOperator.passwordHash);
+      // Verifica password con hash locale
+      if (operator.passwordHash) {
+        const isValid = await verifyPassword(password, operator.passwordHash);
         if (!isValid) {
           setError('Email o password non validi');
           return null;
         }
-      } else {
-        // Prima impostazione password per operatori legacy (senza hash)
-        if (!password || password.length < 6) {
-          setError('Password non valida (minimo 6 caratteri)');
-          return null;
-        }
+      } else if (password && password.length >= 6) {
+        // Prima password: salva l'hash
         const newHash = await hashPassword(password);
-        const updated = await withTimeout(
-          operatorsApi.update(operator.id, { passwordHash: newHash }),
-          12000,
-          'Timeout durante il salvataggio della password. Riprova.'
-        );
-        resolvedOperator = updated || { ...operator, passwordHash: newHash };
+        try {
+          await operatorsApi.update(operator.id, { passwordHash: newHash });
+        } catch (e) {
+          console.warn('[auth] Could not save password hash:', e);
+        }
+      } else {
+        setError('Password non valida (minimo 6 caratteri)');
+        return null;
       }
 
       // Aggiorna ultimo accesso
-      await withTimeout(
-        operatorsApi.updateLastAccess(resolvedOperator.id),
-        12000,
-        'Timeout durante l\'aggiornamento ultimo accesso.'
-      );
+      try {
+        await operatorsApi.updateLastAccess(operator.id);
+      } catch (e) {
+        console.warn('[auth] Could not update last access:', e);
+      }
 
-      setCurrentOperator(resolvedOperator);
-      return resolvedOperator;
+      setCurrentOperator(operator);
+      console.log('[auth] login done');
+      return operator;
     } catch (err) {
+      console.error('[auth] login error', err);
       setError(err instanceof Error ? err.message : 'Errore nel login');
       return null;
     } finally {
@@ -254,6 +256,7 @@ export function useAuth() {
   };
 
   const logout = () => {
+    supabase.auth.signOut();
     setCurrentOperator(null);
   };
 
@@ -269,7 +272,7 @@ export function useAuth() {
 
 // ============ SETTINGS HOOK ============
 
-export function useSettings(operatorId: string | null) {
+export function useSettings(operatorEmail: string | null) {
   const [settings, setSettingsState] = useState<AppSettings>({
     theme: 'light',
     fontSize: 'medium',
@@ -283,12 +286,12 @@ export function useSettings(operatorId: string | null) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!operatorId) return;
+    if (!operatorEmail) return;
 
     const fetchSettings = async () => {
       try {
         setLoading(true);
-        const data = await settingsApi.get(operatorId);
+        const data = await settingsApi.get(operatorEmail);
         if (data) {
           setSettingsState(data);
         }
@@ -300,14 +303,14 @@ export function useSettings(operatorId: string | null) {
     };
 
     fetchSettings();
-  }, [operatorId]);
+  }, [operatorEmail]);
 
   const updateSettings = async (newSettings: AppSettings) => {
     setSettingsState(newSettings);
 
-    if (operatorId) {
+    if (operatorEmail) {
       try {
-        await settingsApi.upsert(operatorId, newSettings);
+        await settingsApi.upsert(operatorEmail, newSettings);
       } catch (err) {
         console.error('Error saving settings:', err);
       }

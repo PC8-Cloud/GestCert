@@ -50,8 +50,16 @@ export async function uploadDataUrlToStorage(
   path: string,
   dataUrl: string
 ): Promise<void> {
+  // Ignora URL non-data (blob:, https://, etc.)
+  if (!dataUrl.startsWith('data:')) {
+    console.warn('[storage] Skipping non-data URL:', dataUrl.substring(0, 50));
+    return;
+  }
   const parsed = dataUrlToBlob(dataUrl);
-  if (!parsed) throw new Error('Formato file non valido');
+  if (!parsed) {
+    console.warn('[storage] Could not parse data URL');
+    return; // Non lanciare errore, ignora silenziosamente
+  }
   const { blob, mimeType } = parsed;
   const { error } = await supabase.storage.from(bucket).upload(path, blob, {
     upsert: true,

@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS operators (
   last_name TEXT NOT NULL,
   email TEXT UNIQUE NOT NULL,
   password_hash TEXT,
+  auth_user_id UUID,
   role TEXT DEFAULT 'Segreteria' CHECK (role IN ('Amministratore', 'Segreteria')),
   status TEXT DEFAULT 'Attivo' CHECK (status IN ('Attivo', 'Sospeso', 'Bloccato')),
   last_access TIMESTAMPTZ,
@@ -105,6 +106,7 @@ CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
 CREATE INDEX IF NOT EXISTS idx_certificates_user_id ON certificates(user_id);
 CREATE INDEX IF NOT EXISTS idx_certificates_expiry_date ON certificates(expiry_date);
 CREATE INDEX IF NOT EXISTS idx_operators_email ON operators(email);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_operators_auth_user_id ON operators(auth_user_id);
 
 -- Abilita Row Level Security
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
@@ -115,14 +117,103 @@ ALTER TABLE smtp_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notification_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE email_templates ENABLE ROW LEVEL SECURITY;
 
--- Policy per permettere accesso (per ora aperto, poi da restringere con auth)
-CREATE POLICY "Enable all access for users" ON users FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Enable all access for certificates" ON certificates FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Enable all access for operators" ON operators FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Enable all access for settings" ON settings FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Enable all access for smtp_settings" ON smtp_settings FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Enable all access for notification_settings" ON notification_settings FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Enable all access for email_templates" ON email_templates FOR ALL USING (true) WITH CHECK (true);
+-- Policy per accesso con Supabase Auth
+DROP POLICY IF EXISTS "Enable all access for users" ON users;
+DROP POLICY IF EXISTS "Enable all access for certificates" ON certificates;
+DROP POLICY IF EXISTS "Enable all access for operators" ON operators;
+DROP POLICY IF EXISTS "Enable all access for settings" ON settings;
+DROP POLICY IF EXISTS "Enable all access for smtp_settings" ON smtp_settings;
+DROP POLICY IF EXISTS "Enable all access for notification_settings" ON notification_settings;
+DROP POLICY IF EXISTS "Enable all access for email_templates" ON email_templates;
+
+CREATE POLICY "Users access for authenticated" ON users
+  FOR ALL USING (auth.role() = 'authenticated') WITH CHECK (auth.role() = 'authenticated');
+
+CREATE POLICY "Certificates access for authenticated" ON certificates
+  FOR ALL USING (auth.role() = 'authenticated') WITH CHECK (auth.role() = 'authenticated');
+
+CREATE POLICY "Operators self read" ON operators
+  FOR SELECT USING (auth.uid() = auth_user_id);
+
+CREATE POLICY "Operators admin all" ON operators
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM operators o
+      WHERE o.auth_user_id = auth.uid()
+        AND o.role = 'Amministratore'
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM operators o
+      WHERE o.auth_user_id = auth.uid()
+        AND o.role = 'Amministratore'
+    )
+  );
+
+CREATE POLICY "Settings self access" ON settings
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM operators o
+      WHERE o.id = settings.operator_id
+        AND o.auth_user_id = auth.uid()
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM operators o
+      WHERE o.id = settings.operator_id
+        AND o.auth_user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "SMTP admin access" ON smtp_settings
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM operators o
+      WHERE o.auth_user_id = auth.uid()
+        AND o.role = 'Amministratore'
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM operators o
+      WHERE o.auth_user_id = auth.uid()
+        AND o.role = 'Amministratore'
+    )
+  );
+
+CREATE POLICY "Notification admin access" ON notification_settings
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM operators o
+      WHERE o.auth_user_id = auth.uid()
+        AND o.role = 'Amministratore'
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM operators o
+      WHERE o.auth_user_id = auth.uid()
+        AND o.role = 'Amministratore'
+    )
+  );
+
+CREATE POLICY "Templates admin access" ON email_templates
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM operators o
+      WHERE o.auth_user_id = auth.uid()
+        AND o.role = 'Amministratore'
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM operators o
+      WHERE o.auth_user_id = auth.uid()
+        AND o.role = 'Amministratore'
+    )
+  );
 
 -- Tabella bacheca (note condivise tra operatori)
 CREATE TABLE IF NOT EXISTS bacheca (
@@ -139,7 +230,9 @@ CREATE INDEX IF NOT EXISTS idx_bacheca_created_at ON bacheca(created_at DESC);
 
 -- Policy per bacheca (tutti gli operatori possono leggere e scrivere)
 ALTER TABLE bacheca ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Enable all access for bacheca" ON bacheca FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Enable all access for bacheca" ON bacheca;
+CREATE POLICY "Bacheca access for authenticated" ON bacheca
+  FOR ALL USING (auth.role() = 'authenticated') WITH CHECK (auth.role() = 'authenticated');
 
 -- Tabella comuni italiani (codici catastali per CF)
 CREATE TABLE IF NOT EXISTS comuni (
@@ -164,6 +257,11 @@ CREATE POLICY "Enable read access for comuni" ON comuni FOR SELECT USING (true);
 INSERT INTO operators (first_name, last_name, email, role, status)
 VALUES ('Admin', 'System', 'admin@cassaedile.ag.it', 'Amministratore', 'Attivo')
 
+ON CONFLICT (email) DO NOTHING;
+
+-- Inserisci super admin di default (creare anche l'utente Auth con email admin@admin)
+INSERT INTO operators (first_name, last_name, email, role, status)
+VALUES ('Super', 'Admin', 'admin@admin', 'Amministratore', 'Attivo')
 ON CONFLICT (email) DO NOTHING;
 
 -- Impostazioni notifiche default
