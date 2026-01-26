@@ -278,7 +278,7 @@ const Settings: React.FC<SettingsProps> = ({ settings, setSettings, role, users,
   };
 
   // ============ EMAIL CONFIGURATION STATE ============
-  const [emailConfig, setEmailConfig] = useState<SmtpConfig>(DEFAULT_SMTP_CONFIG);
+  const [emailConfig, setEmailConfig] = useState<SmtpConfig & { hasPassword?: boolean }>(DEFAULT_SMTP_CONFIG);
   const [notificationSettings, setNotificationSettingsState] = useState<NotificationSettings>(DEFAULT_NOTIFICATION_SETTINGS);
   const [emailTemplates, setEmailTemplates] = useState<Record<EmailTemplate['key'], EmailTemplate>>(DEFAULT_EMAIL_TEMPLATES);
   const [testEmail, setTestEmail] = useState('');
@@ -1183,13 +1183,24 @@ const Settings: React.FC<SettingsProps> = ({ settings, setSettings, role, users,
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Password SMTP</label>
+                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                  Password SMTP
+                  {emailConfig.hasPassword && !emailConfig.password && (
+                    <span className="ml-2 text-green-600 dark:text-green-400 text-xs">(configurata)</span>
+                  )}
+                </label>
                 <input
                   type="password"
                   value={emailConfig.password}
                   onChange={e => setEmailConfig(prev => ({ ...prev, password: e.target.value }))}
+                  placeholder={emailConfig.hasPassword ? '••••••••' : 'Inserisci password'}
                   className="w-full p-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded text-sm"
                 />
+                {emailConfig.hasPassword && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Lascia vuoto per mantenere la password attuale
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Email Mittente</label>
