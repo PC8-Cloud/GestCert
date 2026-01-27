@@ -119,7 +119,7 @@ const Layout: React.FC<LayoutProps> = ({ children, userRole, onLogout, userName 
           {children}
           
           <footer className="mt-8 py-4 text-center text-xs text-gray-400 border-t border-gray-200 dark:border-gray-700">
-             GestCert &copy; 2026 Cassa Edile Agrigentina - Prodotto e gestito da PC8 srl, Build 2.0
+             GestCert &copy; 2026 Cassa Edile Agrigentina - Prodotto e gestito da PC8 srl, Build 2.1
           </footer>
         </main>
       </div>
