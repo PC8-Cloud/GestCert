@@ -696,7 +696,8 @@ function mapDbUserToUser(dbUser: Record<string, unknown>): User {
     group: dbUser.user_group as string | undefined,
     notes: dbUser.notes as string | undefined,
     status: dbUser.status as UserStatus,
-    certificates: ((dbUser.certificates as Record<string, unknown>[]) || []).map(mapDbCertToCert)
+    certificates: ((dbUser.certificates as Record<string, unknown>[]) || []).map(mapDbCertToCert),
+    createdAt: dbUser.created_at as string | undefined
   };
 }
 

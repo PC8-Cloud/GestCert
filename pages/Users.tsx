@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams, useLocation } from 'react-router-dom';
 import { User, UserStatus, Role, Certificate } from '../types';
-import { Search, Plus, Upload, Filter, Lock, Unlock, Edit, Trash2, Save, X, Eye, Download, ChevronDown, ChevronUp, AlertCircle, FileText, CheckCircle, XCircle } from 'lucide-react';
+import { Search, Plus, Upload, Lock, Unlock, Edit, Trash2, Save, X, Eye, Download, ChevronDown, ChevronUp, AlertCircle, FileText, CheckCircle, XCircle } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import AddressAutocomplete from '../components/AddressAutocomplete';
 import { CertificateFilter } from './Dashboard';
@@ -203,6 +203,7 @@ const Users: React.FC<UsersProps> = ({ users, setUsers, createUser, updateUser, 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  const [sortOrder, setSortOrder] = useState<'lastName-asc' | 'lastName-desc' | 'createdAt-asc' | 'createdAt-desc'>('lastName-asc');
   const pendingLocationKey = useRef<string | null>(null);
 
   // Keep refs in sync for navigation guard
@@ -277,8 +278,26 @@ const Users: React.FC<UsersProps> = ({ users, setUsers, createUser, updateUser, 
       );
     }
 
+    // Applica ordinamento
+    result = [...result].sort((a, b) => {
+      switch (sortOrder) {
+        case 'lastName-asc':
+          return a.lastName.localeCompare(b.lastName, 'it');
+        case 'lastName-desc':
+          return b.lastName.localeCompare(a.lastName, 'it');
+        case 'createdAt-asc':
+          // Più vecchi prima
+          return (a.createdAt || '').localeCompare(b.createdAt || '');
+        case 'createdAt-desc':
+          // Più recenti prima
+          return (b.createdAt || '').localeCompare(a.createdAt || '');
+        default:
+          return 0;
+      }
+    });
+
     return result;
-  }, [users, certFilter, searchTerm]);
+  }, [users, certFilter, searchTerm, sortOrder]);
   
   // Handlers
   const handleEdit = (user: User) => {
@@ -687,7 +706,7 @@ const Users: React.FC<UsersProps> = ({ users, setUsers, createUser, updateUser, 
             )}
           </div>
           
-          <div className="flex gap-4 items-center flex-1 max-w-lg">
+          <div className="flex gap-3 items-center flex-1 max-w-2xl">
              <div className="relative flex-1">
                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                <input
@@ -698,9 +717,16 @@ const Users: React.FC<UsersProps> = ({ users, setUsers, createUser, updateUser, 
                  onChange={(e) => setSearchTerm(e.target.value)}
                />
              </div>
-             <button className="p-2 text-gray-600 hover:bg-gray-100 rounded-md border border-gray-300">
-               <Filter size={18} />
-             </button>
+             <select
+               value={sortOrder}
+               onChange={(e) => setSortOrder(e.target.value as typeof sortOrder)}
+               className="px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md focus:outline-none focus:ring-2 focus:ring-secondary/50 text-sm"
+             >
+               <option value="lastName-asc">Cognome A-Z</option>
+               <option value="lastName-desc">Cognome Z-A</option>
+               <option value="createdAt-desc">Più recenti</option>
+               <option value="createdAt-asc">Più vecchi</option>
+             </select>
           </div>
         </div>
 

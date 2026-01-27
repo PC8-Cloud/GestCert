@@ -39,6 +39,7 @@ export interface User {
   notes?: string;
   status: UserStatus;
   certificates: Certificate[];
+  createdAt?: string; // Data di inserimento
 }
 
 export interface Operator {
