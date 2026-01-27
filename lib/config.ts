@@ -9,7 +9,7 @@ export type StorageMode = 'local' | 'supabase' | 'hybrid';
 export const STORAGE_MODE: StorageMode = 'hybrid';
 
 // Supabase Storage bucket (for certificate files)
-export const STORAGE_BUCKET = 'GESTCERT';
+export const STORAGE_BUCKET = 'GestCert';
 
 // Chiavi per localStorage
 export const LOCAL_STORAGE_KEYS = {
