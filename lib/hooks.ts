@@ -19,7 +19,7 @@ import { hashPassword, verifyPassword } from './password';
 // Seleziona i servizi in base alla modalita' di storage
 // In modalità 'hybrid': login locale + dati da Supabase
 const usersApi = STORAGE_MODE === 'local' ? localUsersService : usersService;
-const operatorsApi = STORAGE_MODE === 'supabase' ? operatorsService : localOperatorsService; // hybrid usa locale
+const operatorsApi = STORAGE_MODE === 'local' ? localOperatorsService : operatorsService; // hybrid usa Supabase
 const settingsApi = STORAGE_MODE === 'local' ? localSettingsService : settingsService; // hybrid usa Supabase
 const bachecaApi = STORAGE_MODE === 'local' ? localBachecaService : bachecaService; // hybrid usa Supabase
 const activitiesApi = localActivitiesService; // Sempre locale per semplicità
