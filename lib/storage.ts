@@ -9,10 +9,12 @@ export function looksLikeBase64(value: string): boolean {
 }
 
 export function dataUrlToBlob(dataUrl: string): { blob: Blob; mimeType: string } | null {
-  const matches = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+  const matches = dataUrl.match(/^data:([^;]+)(;[^,]*)?,(.+)$/);
   if (!matches) return null;
   const mimeType = matches[1];
-  const base64Data = matches[2];
+  const meta = matches[2] || '';
+  if (!meta.includes('base64')) return null;
+  const base64Data = matches[3];
   const byteCharacters = atob(base64Data);
   const byteNumbers = new Array(byteCharacters.length);
   for (let i = 0; i < byteCharacters.length; i++) {
@@ -43,6 +45,14 @@ export function parseStorageUrl(url: string): { bucket: string; path: string } |
   const path = withoutScheme.slice(firstSlash + 1);
   if (!bucket || !path) return null;
   return { bucket, path };
+}
+
+export async function deleteStorageUrl(url: string): Promise<boolean> {
+  const ref = parseStorageUrl(url);
+  if (!ref) return false;
+  const { error } = await supabase.storage.from(ref.bucket).remove([ref.path]);
+  if (error) throw error;
+  return true;
 }
 
 export async function uploadDataUrlToStorage(

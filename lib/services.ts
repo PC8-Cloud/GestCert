@@ -2,7 +2,7 @@ import { supabase } from './supabase';
 import { User, Certificate, Operator, UserStatus, Role, AppSettings } from '../types';
 import { hashPassword } from './password';
 import { STORAGE_BUCKET } from './config';
-import { base64ToDataUrl, isDataUrl, looksLikeBase64, storageUrlFor, uploadDataUrlToStorage } from './storage';
+import { base64ToDataUrl, deleteStorageUrl, isDataUrl, looksLikeBase64, storageUrlFor, uploadDataUrlToStorage } from './storage';
 
 function getExtensionFromDataUrl(dataUrl: string): string {
   if (dataUrl.startsWith('data:application/pdf')) return 'pdf';
@@ -166,49 +166,111 @@ export const usersService = {
       throw error;
     }
 
-    // Se ci sono certificati, creali
-    const certificates: Certificate[] = [];
+    // Se ci sono certificati, creali con sistema di retry e verifica
     if (user.certificates && user.certificates.length > 0) {
-      for (const cert of user.certificates) {
-        let fileUrl = cert.fileUrl || null;
-        if (fileUrl && !fileUrl.startsWith('storage://')) {
-          if (!isDataUrl(fileUrl) && looksLikeBase64(fileUrl)) {
-            const normalized = base64ToDataUrl(fileUrl);
-            if (normalized) fileUrl = normalized;
-          }
-            if (fileUrl && isDataUrl(fileUrl)) {
-              const safeName = cert.name.replace(/[^a-zA-Z0-9àèéìòùÀÈÉÌÒÙ_-]/g, '_');
-              const ext = getExtensionFromDataUrl(fileUrl);
-              const path = `users/${data.id}/${Date.now()}_${safeName}.${ext}`;
-              const uploaded = await uploadDataUrlToStorage(STORAGE_BUCKET, path, fileUrl);
-              fileUrl = uploaded ? storageUrlFor(STORAGE_BUCKET, path) : null;
-            }
-          }
-        const { data: certData, error: certError } = await supabase
-          .from('certificates')
-          .insert({
-            user_id: data.id,
-            name: cert.name,
-            issue_date: cert.issueDate || null,
-            expiry_date: cert.expiryDate,
-            file_url: fileUrl || null
-          })
-          .select()
-          .single();
+      // Helper per preparare fileUrl per upload
+      const prepareFileUrl = async (fileUrl: string | null | undefined, certName: string, userId: string): Promise<string | null> => {
+        if (!fileUrl) return null;
+        if (fileUrl.startsWith('storage://')) return fileUrl;
 
-        if (certError) {
-          console.error(`Errore creazione certificato ${cert.name}:`, certError);
-          // Se l'errore è per dimensione file troppo grande, segnala all'utente
-          if (certError.message?.includes('too large') || certError.code === '54000') {
-            throw new Error(`Il file allegato al certificato "${cert.name}" è troppo grande. Rimuovi il file e riprova.`);
+        if (!isDataUrl(fileUrl) && looksLikeBase64(fileUrl)) {
+          const normalized = base64ToDataUrl(fileUrl);
+          if (normalized) fileUrl = normalized;
+        }
+
+        if (fileUrl && isDataUrl(fileUrl)) {
+          const safeName = certName.replace(/[^a-zA-Z0-9àèéìòùÀÈÉÌÒÙ_-]/g, '_');
+          const ext = getExtensionFromDataUrl(fileUrl);
+          const path = `users/${userId}/${Date.now()}_${safeName}.${ext}`;
+          const uploaded = await uploadDataUrlToStorage(STORAGE_BUCKET, path, fileUrl);
+          return uploaded ? storageUrlFor(STORAGE_BUCKET, path) : null;
+        }
+        return null;
+      };
+
+      // Helper per inserire con retry
+      const insertWithRetry = async (
+        cert: Certificate,
+        userId: string,
+        preparedFileUrl: string | null,
+        maxRetries: number = 3
+      ): Promise<boolean> => {
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          const { error: insertError } = await supabase
+            .from('certificates')
+            .insert({
+              user_id: userId,
+              name: cert.name,
+              issue_date: cert.issueDate || null,
+              expiry_date: cert.expiryDate,
+              file_url: preparedFileUrl
+            });
+
+          if (!insertError) {
+            console.log(`[Cert] Certificato "${cert.name}" salvato (tentativo ${attempt})`);
+            return true;
           }
-        } else if (certData) {
-          certificates.push(mapDbCertToCert(certData));
+
+          console.warn(`[Cert] Tentativo ${attempt}/${maxRetries} fallito per "${cert.name}":`, insertError.message);
+
+          if (insertError.message?.includes('too large') || insertError.code === '54000') {
+            throw new Error(`Il file allegato al certificato "${cert.name}" è troppo grande.`);
+          }
+
+          if (attempt < maxRetries) {
+            await new Promise(resolve => setTimeout(resolve, 500 * attempt));
+          }
+        }
+        return false;
+      };
+
+      // Inserisci tutti i certificati
+      for (const cert of user.certificates) {
+        const fileUrl = await prepareFileUrl(cert.fileUrl, cert.name, data.id);
+        await insertWithRetry(cert, data.id, fileUrl);
+      }
+
+      // VERIFICA: controlla che tutti i certificati siano stati salvati
+      const { data: savedCerts } = await supabase
+        .from('certificates')
+        .select('name')
+        .eq('user_id', data.id);
+
+      const savedNames = new Set((savedCerts || []).map(c => (c.name as string).toLowerCase().trim()));
+      const expectedCerts = user.certificates.filter(c => c.name && c.expiryDate);
+      const missing = expectedCerts.filter(c => !savedNames.has(c.name.toLowerCase().trim()));
+
+      // Riprova per i mancanti
+      if (missing.length > 0) {
+        console.warn(`[Cert] ${missing.length} certificati mancanti, riprovo...`);
+        for (const cert of missing) {
+          const fileUrl = await prepareFileUrl(cert.fileUrl, cert.name, data.id);
+          await insertWithRetry(cert, data.id, fileUrl, 2);
+        }
+
+        // Verifica finale
+        const { data: finalCerts } = await supabase
+          .from('certificates')
+          .select('name')
+          .eq('user_id', data.id);
+
+        const finalNames = new Set((finalCerts || []).map(c => (c.name as string).toLowerCase().trim()));
+        const stillMissing = expectedCerts.filter(c => !finalNames.has(c.name.toLowerCase().trim()));
+
+        if (stillMissing.length > 0) {
+          const names = stillMissing.map(c => c.name).join(', ');
+          throw new Error(`Impossibile salvare i certificati: ${names}. Riprova.`);
         }
       }
     }
 
-    return mapDbUserToUser({ ...data, certificates });
+    // Recupera certificati salvati
+    const { data: finalCertificates } = await supabase
+      .from('certificates')
+      .select('*')
+      .eq('user_id', data.id);
+
+    return mapDbUserToUser({ ...data, certificates: finalCertificates || [] });
   },
 
   async update(id: string, user: Partial<User>): Promise<User> {
@@ -245,6 +307,63 @@ export const usersService = {
 
     // Gestisci i certificati se forniti
     if (user.certificates !== undefined) {
+      // Helper per preparare fileUrl per upload
+      const prepareFileUrl = async (fileUrl: string | null | undefined, certName: string, userId: string): Promise<string | null> => {
+        if (!fileUrl) return null;
+        if (fileUrl.startsWith('storage://')) return fileUrl; // Già su storage
+
+        if (!isDataUrl(fileUrl) && looksLikeBase64(fileUrl)) {
+          const normalized = base64ToDataUrl(fileUrl);
+          if (normalized) fileUrl = normalized;
+        }
+
+        if (fileUrl && isDataUrl(fileUrl)) {
+          const safeName = certName.replace(/[^a-zA-Z0-9àèéìòùÀÈÉÌÒÙ_-]/g, '_');
+          const ext = getExtensionFromDataUrl(fileUrl);
+          const path = `users/${userId}/${Date.now()}_${safeName}.${ext}`;
+          const uploaded = await uploadDataUrlToStorage(STORAGE_BUCKET, path, fileUrl);
+          return uploaded ? storageUrlFor(STORAGE_BUCKET, path) : null;
+        }
+        return null;
+      };
+
+      // Helper per inserire un certificato con retry
+      const insertCertificateWithRetry = async (
+        cert: Certificate,
+        userId: string,
+        preparedFileUrl: string | null,
+        maxRetries: number = 3
+      ): Promise<{ success: boolean; error?: string }> => {
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          const { error: insertError } = await supabase
+            .from('certificates')
+            .insert({
+              user_id: userId,
+              name: cert.name,
+              issue_date: cert.issueDate || null,
+              expiry_date: cert.expiryDate,
+              file_url: preparedFileUrl
+            });
+
+          if (!insertError) {
+            console.log(`[Cert] Certificato "${cert.name}" salvato con successo (tentativo ${attempt})`);
+            return { success: true };
+          }
+
+          console.warn(`[Cert] Tentativo ${attempt}/${maxRetries} fallito per "${cert.name}":`, insertError.message);
+
+          if (insertError.message?.includes('too large') || insertError.code === '54000') {
+            return { success: false, error: `File troppo grande per "${cert.name}"` };
+          }
+
+          // Aspetta prima di riprovare (backoff esponenziale)
+          if (attempt < maxRetries) {
+            await new Promise(resolve => setTimeout(resolve, 500 * attempt));
+          }
+        }
+        return { success: false, error: `Impossibile salvare "${cert.name}" dopo ${maxRetries} tentativi` };
+      };
+
       // Recupera certificati esistenti
       const { data: existingCerts, error: fetchError } = await supabase
         .from('certificates')
@@ -263,6 +382,13 @@ export const usersService = {
       // Trova certificati da eliminare (esistono nel DB ma non nella lista nuova)
       const toDelete = existingList.filter(c => !newCertIds.has(c.id));
       for (const cert of toDelete) {
+        if (cert.file_url && typeof cert.file_url === 'string') {
+          try {
+            await deleteStorageUrl(cert.file_url);
+          } catch (err) {
+            console.warn(`Errore rimozione file storage per certificato ${cert.id}:`, err);
+          }
+        }
         const { error: deleteError } = await supabase
           .from('certificates')
           .delete()
@@ -279,30 +405,18 @@ export const usersService = {
       // Trova certificati da aggiornare (già presenti nel DB)
       const toUpdate = user.certificates.filter(c => existingIds.has(c.id));
 
+      // Aggiorna certificati esistenti
       for (const cert of toUpdate) {
         const existing = existingById.get(cert.id);
         if (!existing) continue;
 
-        let fileUrl = cert.fileUrl || null;
-        if (fileUrl && !fileUrl.startsWith('storage://')) {
-          if (!isDataUrl(fileUrl) && looksLikeBase64(fileUrl)) {
-            const normalized = base64ToDataUrl(fileUrl);
-            if (normalized) fileUrl = normalized;
-          }
-          if (fileUrl && isDataUrl(fileUrl)) {
-            const safeName = cert.name.replace(/[^a-zA-Z0-9àèéìòùÀÈÉÌÒÙ_-]/g, '_');
-            const ext = getExtensionFromDataUrl(fileUrl);
-            const path = `users/${id}/${Date.now()}_${safeName}.${ext}`;
-            const uploaded = await uploadDataUrlToStorage(STORAGE_BUCKET, path, fileUrl);
-            fileUrl = uploaded ? storageUrlFor(STORAGE_BUCKET, path) : null;
-          }
-        }
+        const fileUrl = await prepareFileUrl(cert.fileUrl, cert.name, id);
 
         const updatePayload = {
           name: cert.name,
           issue_date: cert.issueDate || null,
           expiry_date: cert.expiryDate,
-          file_url: fileUrl || null
+          file_url: fileUrl
         };
 
         const isSame =
@@ -321,43 +435,83 @@ export const usersService = {
             console.error(`Errore aggiornamento certificato ${cert.name}:`, updateError);
             if (updateError.message?.includes('too large') || updateError.code === '54000') {
               throw new Error(`Il file allegato al certificato "${cert.name}" è troppo grande. Rimuovi il file e riprova.`);
+            } else {
+              throw new Error(`Impossibile aggiornare il certificato "${cert.name}": ${updateError.message || 'errore sconosciuto'}`);
+            }
+          } else {
+            const oldFileUrl = existing.file_url as string | null;
+            const newFileUrl = updatePayload.file_url as string | null;
+            if (oldFileUrl && oldFileUrl.startsWith('storage://') && oldFileUrl !== newFileUrl) {
+              try {
+                await deleteStorageUrl(oldFileUrl);
+              } catch (err) {
+                console.warn(`Errore rimozione vecchio file storage per certificato ${cert.id}:`, err);
+              }
             }
           }
         }
       }
 
+      // Prepara i file URL per i nuovi certificati (prima di inserirli)
+      const toAddWithUrls: Array<{ cert: Certificate; fileUrl: string | null }> = [];
       for (const cert of toAdd) {
-        let fileUrl = cert.fileUrl || null;
-        if (fileUrl && !fileUrl.startsWith('storage://')) {
-          if (!isDataUrl(fileUrl) && looksLikeBase64(fileUrl)) {
-            const normalized = base64ToDataUrl(fileUrl);
-            if (normalized) fileUrl = normalized;
-          }
-          if (fileUrl && isDataUrl(fileUrl)) {
-            const safeName = cert.name.replace(/[^a-zA-Z0-9àèéìòùÀÈÉÌÒÙ_-]/g, '_');
-            const ext = getExtensionFromDataUrl(fileUrl);
-            const path = `users/${id}/${Date.now()}_${safeName}.${ext}`;
-            const uploaded = await uploadDataUrlToStorage(STORAGE_BUCKET, path, fileUrl);
-            fileUrl = uploaded ? storageUrlFor(STORAGE_BUCKET, path) : null;
-          }
-        }
-        const { error: insertError } = await supabase
-          .from('certificates')
-          .insert({
-            user_id: id,
-            name: cert.name,
-            issue_date: cert.issueDate || null,
-            expiry_date: cert.expiryDate,
-            file_url: fileUrl || null
-          });
+        const fileUrl = await prepareFileUrl(cert.fileUrl, cert.name, id);
+        toAddWithUrls.push({ cert, fileUrl });
+      }
 
-        if (insertError) {
-          console.error(`Errore inserimento certificato ${cert.name}:`, insertError);
-          // Se l'errore è per dimensione file troppo grande, segnala all'utente
-          if (insertError.message?.includes('too large') || insertError.code === '54000') {
-            throw new Error(`Il file allegato al certificato "${cert.name}" è troppo grande. Rimuovi il file e riprova.`);
+      // Inserisci nuovi certificati con retry
+      const insertErrors: string[] = [];
+      for (const { cert, fileUrl } of toAddWithUrls) {
+        const result = await insertCertificateWithRetry(cert, id, fileUrl);
+        if (!result.success && result.error) {
+          insertErrors.push(result.error);
+        }
+      }
+
+      // VERIFICA POST-SALVATAGGIO: controlla che tutti i certificati siano nel DB
+      const { data: savedCerts, error: verifyError } = await supabase
+        .from('certificates')
+        .select('*')
+        .eq('user_id', id);
+
+      if (verifyError) {
+        console.error('Errore verifica certificati:', verifyError);
+      }
+
+      const savedCertNames = new Set((savedCerts || []).map(c => (c.name as string).toLowerCase().trim()));
+      const expectedCerts = user.certificates.filter(c => c.name && c.expiryDate);
+      const missingCerts = expectedCerts.filter(c => !savedCertNames.has(c.name.toLowerCase().trim()));
+
+      // Se ci sono certificati mancanti, riprova
+      if (missingCerts.length > 0) {
+        console.warn(`[Cert] Verifica fallita: ${missingCerts.length} certificati mancanti. Riprovo...`);
+
+        for (const cert of missingCerts) {
+          const fileUrl = await prepareFileUrl(cert.fileUrl, cert.name, id);
+          const result = await insertCertificateWithRetry(cert, id, fileUrl, 2);
+          if (!result.success && result.error) {
+            insertErrors.push(result.error);
           }
         }
+
+        // Verifica finale
+        const { data: finalCerts } = await supabase
+          .from('certificates')
+          .select('name')
+          .eq('user_id', id);
+
+        const finalCertNames = new Set((finalCerts || []).map(c => (c.name as string).toLowerCase().trim()));
+        const stillMissing = expectedCerts.filter(c => !finalCertNames.has(c.name.toLowerCase().trim()));
+
+        if (stillMissing.length > 0) {
+          const missingNames = stillMissing.map(c => c.name).join(', ');
+          throw new Error(`Impossibile salvare i seguenti certificati: ${missingNames}. Verifica la connessione e riprova.`);
+        }
+      }
+
+      // Se ci sono stati errori ma tutti i certificati sono ora salvati, mostra warning
+      if (insertErrors.length > 0) {
+        console.warn('[Cert] Alcuni errori durante il salvataggio (risolti con retry):', insertErrors);
       }
     }
 
@@ -375,6 +529,23 @@ export const usersService = {
   },
 
   async delete(id: string): Promise<void> {
+    const { data: certs, error: certsError } = await supabase
+      .from('certificates')
+      .select('file_url')
+      .eq('user_id', id);
+
+    if (!certsError && certs) {
+      for (const cert of certs) {
+        if (cert.file_url && typeof cert.file_url === 'string') {
+          try {
+            await deleteStorageUrl(cert.file_url);
+          } catch (err) {
+            console.warn(`Errore rimozione file storage per utente ${id}:`, err);
+          }
+        }
+      }
+    }
+
     const { error } = await supabase
       .from('users')
       .delete()
@@ -384,6 +555,23 @@ export const usersService = {
   },
 
   async deleteMany(ids: string[]): Promise<void> {
+    const { data: certs, error: certsError } = await supabase
+      .from('certificates')
+      .select('file_url')
+      .in('user_id', ids);
+
+    if (!certsError && certs) {
+      for (const cert of certs) {
+        if (cert.file_url && typeof cert.file_url === 'string') {
+          try {
+            await deleteStorageUrl(cert.file_url);
+          } catch (err) {
+            console.warn('Errore rimozione file storage per eliminazione multipla:', err);
+          }
+        }
+      }
+    }
+
     const { error } = await supabase
       .from('users')
       .delete()
@@ -414,6 +602,20 @@ export const certificatesService = {
   },
 
   async delete(id: string): Promise<void> {
+    const { data: existing, error: fetchError } = await supabase
+      .from('certificates')
+      .select('file_url')
+      .eq('id', id)
+      .single();
+
+    if (!fetchError && existing?.file_url) {
+      try {
+        await deleteStorageUrl(existing.file_url as string);
+      } catch (err) {
+        console.warn(`Errore rimozione file storage per certificato ${id}:`, err);
+      }
+    }
+
     const { error } = await supabase
       .from('certificates')
       .delete()

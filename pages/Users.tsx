@@ -1580,7 +1580,7 @@ const UserForm: React.FC<UserFormProps> = ({ user, onSave, onCancel, isCreating,
   const viewCertificate = async (cert: Certificate) => {
     let fileUrl = cert.fileUrl || '';
     const storageRef = parseStorageUrl(fileUrl);
-    if (storageRef && STORAGE_MODE === 'supabase') {
+    if (storageRef && STORAGE_MODE !== 'local') {
       try {
         fileUrl = await createSignedUrl(storageRef.bucket, storageRef.path);
       } catch (error) {
@@ -1641,7 +1641,7 @@ const UserForm: React.FC<UserFormProps> = ({ user, onSave, onCancel, isCreating,
   const downloadCertificate = async (cert: Certificate) => {
     let fileUrl = cert.fileUrl || '';
     const storageRef = parseStorageUrl(fileUrl);
-    if (storageRef && STORAGE_MODE === 'supabase') {
+    if (storageRef && STORAGE_MODE !== 'local') {
       try {
         fileUrl = await createSignedUrl(storageRef.bucket, storageRef.path);
       } catch (error) {
