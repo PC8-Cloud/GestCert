@@ -7,7 +7,7 @@ import Users from './pages/Users';
 import Operators from './pages/Operators';
 import Settings from './pages/Settings';
 import { Role, Operator, User } from './types';
-import { useUsers, useOperators, useAuth, useSettings, useInactivityTimeout, useBacheca, useActivities, useTodos } from './lib/hooks';
+import { useUsers, useOperators, useAuth, useSettings, useInactivityTimeout, useBacheca, useActivities } from './lib/hooks';
 
 const App: React.FC = () => {
   // Supabase Hooks
@@ -17,7 +17,6 @@ const App: React.FC = () => {
   const { settings, setSettings } = useSettings(auth.currentOperator?.email || null);
   const bacheca = useBacheca();
   const activities = useActivities();
-  const todos = useTodos();
 
   const handleLogin = async (email: string, password: string): Promise<Operator | null> => {
     const operator = await auth.login(email, password);
@@ -276,7 +275,7 @@ const App: React.FC = () => {
       <div className={settings.theme === 'dark' ? 'dark' : ''}>
         <Layout userRole={userRole} onLogout={handleLogout} userName={userName}>
           <Routes>
-            <Route path="/" element={<Dashboard user={{ name: userName }} settings={settings} users={users} bacheca={bacheca} activities={activities} todos={todos} currentOperator={currentOperator} />} />
+            <Route path="/" element={<Dashboard user={{ name: userName }} settings={settings} users={users} bacheca={bacheca} activities={activities} currentOperator={currentOperator} />} />
             <Route path="/users" element={<Users users={users} setUsers={setUsersWithLogging} createUser={createUserWithLogging} updateUser={updateUserWithLogging} deleteUser={deleteUserWithLogging} deleteUsers={deleteUsersWithLogging} currentUserRole={userRole} />} />
             <Route
               path="/operators"

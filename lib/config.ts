@@ -23,5 +23,4 @@ export const LOCAL_STORAGE_KEYS = {
   EMAIL_CONFIG: 'gestcert_email_config',
   NOTIFICATION_SETTINGS: 'gestcert_notification_settings',
   LAST_NOTIFICATION_CHECK: 'gestcert_last_notification_check',
-  TODOS: 'gestcert_todos',
 };

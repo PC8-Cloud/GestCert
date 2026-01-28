@@ -809,6 +809,10 @@ export interface NotaBacheca {
   operatoreNome: string;
   createdAt: string;
   updatedAt: string;
+  completed: boolean;
+  completedAt?: string;
+  completedBy?: string;
+  completedById?: string;
 }
 
 export const bachecaService = {
@@ -860,6 +864,54 @@ export const bachecaService = {
       .eq('id', id);
 
     if (error) throw error;
+  },
+
+  async toggle(id: string, operatoreId: string, operatoreNome: string): Promise<NotaBacheca> {
+    // Prima recupera lo stato attuale
+    const { data: current, error: fetchError } = await supabase
+      .from('bacheca')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    const isCompleted = current.completed as boolean;
+
+    const updateData = isCompleted
+      ? {
+          completed: false,
+          completed_at: null,
+          completed_by: null,
+          completed_by_id: null,
+          updated_at: new Date().toISOString()
+        }
+      : {
+          completed: true,
+          completed_at: new Date().toISOString(),
+          completed_by: operatoreNome,
+          completed_by_id: operatoreId,
+          updated_at: new Date().toISOString()
+        };
+
+    const { data, error } = await supabase
+      .from('bacheca')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return mapDbNotaToNota(data);
+  },
+
+  async clearCompleted(): Promise<void> {
+    const { error } = await supabase
+      .from('bacheca')
+      .delete()
+      .eq('completed', true);
+
+    if (error) throw error;
   }
 };
 
@@ -870,7 +922,11 @@ function mapDbNotaToNota(dbNota: Record<string, unknown>): NotaBacheca {
     operatoreId: dbNota.operatore_id as string | undefined,
     operatoreNome: dbNota.operatore_nome as string || 'Sistema',
     createdAt: dbNota.created_at as string,
-    updatedAt: dbNota.updated_at as string
+    updatedAt: dbNota.updated_at as string,
+    completed: dbNota.completed as boolean || false,
+    completedAt: dbNota.completed_at as string | undefined,
+    completedBy: dbNota.completed_by as string | undefined,
+    completedById: dbNota.completed_by_id as string | undefined
   };
 }
 

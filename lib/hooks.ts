@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { User, Operator, AppSettings, TodoItem } from '../types';
+import { User, Operator, AppSettings } from '../types';
 import { STORAGE_MODE } from './config';
 import { usersService, operatorsService, settingsService, bachecaService, NotaBacheca } from './services';
 import { supabase } from './supabase';
@@ -10,7 +10,6 @@ import {
   localBachecaService,
   localActivitiesService,
   localCertificateTypesService,
-  localTodosService,
   Activity,
   ActivityType,
   CertificateType
@@ -282,7 +281,6 @@ export function useSettings(operatorEmail: string | null) {
       clock: true,
       calendar: true,
       expiry: true,
-      todoList: true,
     }
   });
   const [loading, setLoading] = useState(false);
@@ -385,6 +383,31 @@ export function useBacheca() {
     }
   };
 
+  const toggleNota = async (id: string, operatoreId: string, operatoreNome: string) => {
+    try {
+      const updated = await bachecaApi.toggle(id, operatoreId, operatoreNome);
+      setNote(prev => {
+        const newList = prev.map(n => n.id === id ? updated : n);
+        // Riordina: non completate prima, poi completate
+        return [...newList.filter(n => !n.completed), ...newList.filter(n => n.completed)];
+      });
+      return updated;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Errore nel toggle nota');
+      throw err;
+    }
+  };
+
+  const clearCompleted = async () => {
+    try {
+      await bachecaApi.clearCompleted();
+      setNote(prev => prev.filter(n => !n.completed));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Errore nella pulizia note completate');
+      throw err;
+    }
+  };
+
   return {
     note,
     loading,
@@ -392,7 +415,9 @@ export function useBacheca() {
     refresh: fetchNote,
     addNota,
     updateNota,
-    deleteNota
+    deleteNota,
+    toggleNota,
+    clearCompleted
   };
 }
 
@@ -578,84 +603,5 @@ export function useCertificateTypes() {
     updateType,
     deleteType,
     resetToDefaults
-  };
-}
-
-// ============ TODOS HOOK ============
-
-export function useTodos() {
-  const [todos, setTodos] = useState<TodoItem[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const fetchTodos = useCallback(async () => {
-    try {
-      setLoading(true);
-      const data = await localTodosService.getAll();
-      setTodos(data);
-    } catch (err) {
-      console.error('Error fetching todos:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchTodos();
-  }, [fetchTodos]);
-
-  const addTodo = async (text: string, operatorId: string, operatorName: string) => {
-    try {
-      const newTodo = await localTodosService.create(text, operatorId, operatorName);
-      setTodos(prev => [newTodo, ...prev.filter(t => !t.completed), ...prev.filter(t => t.completed)]);
-      return newTodo;
-    } catch (err) {
-      console.error('Error creating todo:', err);
-      throw err;
-    }
-  };
-
-  const toggleTodo = async (id: string, operatorId: string, operatorName: string) => {
-    try {
-      const updated = await localTodosService.toggle(id, operatorId, operatorName);
-      setTodos(prev => {
-        const newList = prev.map(t => t.id === id ? updated : t);
-        // Riordina: non completati prima, poi completati
-        return [...newList.filter(t => !t.completed), ...newList.filter(t => t.completed)];
-      });
-      return updated;
-    } catch (err) {
-      console.error('Error toggling todo:', err);
-      throw err;
-    }
-  };
-
-  const deleteTodo = async (id: string) => {
-    try {
-      await localTodosService.delete(id);
-      setTodos(prev => prev.filter(t => t.id !== id));
-    } catch (err) {
-      console.error('Error deleting todo:', err);
-      throw err;
-    }
-  };
-
-  const clearCompleted = async () => {
-    try {
-      await localTodosService.clearCompleted();
-      setTodos(prev => prev.filter(t => !t.completed));
-    } catch (err) {
-      console.error('Error clearing completed todos:', err);
-      throw err;
-    }
-  };
-
-  return {
-    todos,
-    loading,
-    refresh: fetchTodos,
-    addTodo,
-    toggleTodo,
-    deleteTodo,
-    clearCompleted
   };
 }

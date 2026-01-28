@@ -284,13 +284,22 @@ export interface NotaBacheca {
   operatoreNome: string;
   createdAt: string;
   updatedAt: string;
+  completed: boolean;
+  completedAt?: string;
+  completedBy?: string;
+  completedById?: string;
 }
 
 export const localBachecaService = {
   async getAll(): Promise<NotaBacheca[]> {
     const note = getFromStorage<NotaBacheca[]>(LOCAL_STORAGE_KEYS.BACHECA, []);
-    // Ordina per data decrescente
-    return note.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    // Ordina: prima non completate (per data), poi completate
+    return note.sort((a, b) => {
+      if (a.completed !== b.completed) {
+        return a.completed ? 1 : -1;
+      }
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
   },
 
   async create(contenuto: string, operatoreId: string, operatoreNome: string): Promise<NotaBacheca> {
@@ -301,11 +310,11 @@ export const localBachecaService = {
       operatoreId,
       operatoreNome,
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
+      completed: false
     };
-    note.unshift(newNota); // Aggiungi in cima
-    // Mantieni solo le ultime 20 note
-    const limited = note.slice(0, 20);
+    note.unshift(newNota);
+    const limited = note.slice(0, 30);
     saveToStorage(LOCAL_STORAGE_KEYS.BACHECA, limited);
     return newNota;
   },
@@ -324,9 +333,44 @@ export const localBachecaService = {
     return note[index];
   },
 
+  async toggle(id: string, operatoreId: string, operatoreNome: string): Promise<NotaBacheca> {
+    const note = await this.getAll();
+    const index = note.findIndex(n => n.id === id);
+    if (index === -1) throw new Error('Nota non trovata');
+
+    const nota = note[index];
+    if (nota.completed) {
+      note[index] = {
+        ...nota,
+        completed: false,
+        completedAt: undefined,
+        completedBy: undefined,
+        completedById: undefined,
+        updatedAt: new Date().toISOString()
+      };
+    } else {
+      note[index] = {
+        ...nota,
+        completed: true,
+        completedAt: new Date().toISOString(),
+        completedBy: operatoreNome,
+        completedById: operatoreId,
+        updatedAt: new Date().toISOString()
+      };
+    }
+    saveToStorage(LOCAL_STORAGE_KEYS.BACHECA, note);
+    return note[index];
+  },
+
   async delete(id: string): Promise<void> {
     let note = await this.getAll();
     note = note.filter(n => n.id !== id);
+    saveToStorage(LOCAL_STORAGE_KEYS.BACHECA, note);
+  },
+
+  async clearCompleted(): Promise<void> {
+    let note = await this.getAll();
+    note = note.filter(n => !n.completed);
     saveToStorage(LOCAL_STORAGE_KEYS.BACHECA, note);
   }
 };
@@ -522,89 +566,5 @@ export const localCertificateTypesService = {
 
   async reset(): Promise<void> {
     saveToStorage(LOCAL_STORAGE_KEYS.CERTIFICATE_TYPES, DEFAULT_CERTIFICATE_TYPES);
-  }
-};
-
-// ============ LOCAL TODO SERVICE ============
-
-import { TodoItem } from '../types';
-
-export const localTodosService = {
-  async getAll(): Promise<TodoItem[]> {
-    const todos = getFromStorage<TodoItem[]>(LOCAL_STORAGE_KEYS.TODOS, []);
-    // Ordina: prima i non completati (per data creazione), poi i completati
-    return todos.sort((a, b) => {
-      if (a.completed !== b.completed) {
-        return a.completed ? 1 : -1;
-      }
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    });
-  },
-
-  async create(
-    text: string,
-    operatorId: string,
-    operatorName: string
-  ): Promise<TodoItem> {
-    const todos = await this.getAll();
-
-    const newTodo: TodoItem = {
-      id: generateId(),
-      text,
-      completed: false,
-      createdAt: new Date().toISOString(),
-      createdBy: operatorName,
-      createdById: operatorId
-    };
-
-    todos.unshift(newTodo);
-    saveToStorage(LOCAL_STORAGE_KEYS.TODOS, todos);
-    return newTodo;
-  },
-
-  async toggle(
-    id: string,
-    operatorId: string,
-    operatorName: string
-  ): Promise<TodoItem> {
-    const todos = await this.getAll();
-    const index = todos.findIndex(t => t.id === id);
-    if (index === -1) throw new Error('Todo non trovato');
-
-    const todo = todos[index];
-    if (todo.completed) {
-      // Se era completato, lo riapre
-      todos[index] = {
-        ...todo,
-        completed: false,
-        completedAt: undefined,
-        completedBy: undefined,
-        completedById: undefined
-      };
-    } else {
-      // Se non era completato, lo completa
-      todos[index] = {
-        ...todo,
-        completed: true,
-        completedAt: new Date().toISOString(),
-        completedBy: operatorName,
-        completedById: operatorId
-      };
-    }
-
-    saveToStorage(LOCAL_STORAGE_KEYS.TODOS, todos);
-    return todos[index];
-  },
-
-  async delete(id: string): Promise<void> {
-    let todos = await this.getAll();
-    todos = todos.filter(t => t.id !== id);
-    saveToStorage(LOCAL_STORAGE_KEYS.TODOS, todos);
-  },
-
-  async clearCompleted(): Promise<void> {
-    let todos = await this.getAll();
-    todos = todos.filter(t => !t.completed);
-    saveToStorage(LOCAL_STORAGE_KEYS.TODOS, todos);
   }
 };
