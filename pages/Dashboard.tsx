@@ -398,7 +398,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, settings, users, bacheca, a
               <Clock size={20} className="mr-2 text-primary" />
               Attività Recenti
             </h3>
-            <ul className="space-y-3 max-h-64 overflow-y-auto">
+            <ul className="space-y-3 max-h-40 overflow-y-auto">
               {activities.loading ? (
                 <li className="text-sm text-gray-400 italic">Caricamento...</li>
               ) : activities.activities.length === 0 ? (
@@ -477,7 +477,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, settings, users, bacheca, a
             </form>
 
             {/* Lista note */}
-            <ul className="space-y-2 max-h-72 overflow-y-auto">
+            <ul className="space-y-2 max-h-40 overflow-y-auto">
               {bacheca.loading ? (
                 <li className="text-sm text-gray-400 italic">Caricamento...</li>
               ) : bacheca.note.length === 0 ? (
