@@ -404,6 +404,16 @@ export function useBacheca() {
     }
   };
 
+  const clearAll = async () => {
+    try {
+      await bachecaApi.clearAll();
+      setNote([]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Errore nella pulizia bacheca');
+      throw err;
+    }
+  };
+
   return {
     note,
     loading,
@@ -413,7 +423,8 @@ export function useBacheca() {
     updateNota,
     deleteNota,
     toggleNota,
-    clearCompleted
+    clearCompleted,
+    clearAll
   };
 }
 

@@ -482,7 +482,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, settings, users, bacheca, a
                 </li>
               ) : (
                 bacheca.note.map(nota => (
-                  <li key={nota.id} className="flex items-center gap-2 py-1 group">
+                  <li key={nota.id} className="flex items-center gap-2 py-1 group relative">
                     {/* Checkbox */}
                     <button
                       onClick={() => bacheca.toggleNota(
@@ -495,10 +495,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, settings, users, bacheca, a
                           ? 'bg-green-500 border-green-500 text-white'
                           : 'border-gray-300 hover:border-primary'
                       }`}
-                      title={nota.completed && nota.completedBy
-                        ? `Fatto da ${nota.completedBy} il ${formatDate(nota.completedAt || '')}`
-                        : 'Segna come fatto'
-                      }
                     >
                       {nota.completed && <Check size={10} />}
                     </button>
@@ -514,6 +510,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, settings, users, bacheca, a
                         {nota.operatoreNome} · {formatDate(nota.createdAt)}
                       </p>
                     </div>
+
+                    {/* Tooltip chi ha completato */}
+                    {nota.completed && nota.completedBy && (
+                      <div className="absolute left-6 -top-8 hidden group-hover:block z-20">
+                        <div className="bg-gray-800 text-white text-xs rounded px-2 py-1 whitespace-nowrap shadow-lg">
+                          Fatto da <strong>{nota.completedBy}</strong> · {nota.completedAt && formatDate(nota.completedAt)}
+                        </div>
+                      </div>
+                    )}
                   </li>
                 ))
               )}

@@ -384,6 +384,10 @@ export const localBachecaService = {
     let note = await this.getAll();
     note = note.filter(n => !n.completed);
     saveToStorage(LOCAL_STORAGE_KEYS.BACHECA, note);
+  },
+
+  async clearAll(): Promise<void> {
+    saveToStorage(LOCAL_STORAGE_KEYS.BACHECA, []);
   }
 };
 

@@ -28,7 +28,7 @@ interface SettingsProps {
   role: Role;
   users: User[];
   operators: Operator[];
-  bacheca: { note: NotaBacheca[]; loading: boolean };
+  bacheca: { note: NotaBacheca[]; loading: boolean; clearAll: () => Promise<void> };
 }
 
 const Settings: React.FC<SettingsProps> = ({ settings, setSettings, role, users, operators, bacheca }) => {
@@ -41,6 +41,10 @@ const Settings: React.FC<SettingsProps> = ({ settings, setSettings, role, users,
   // Backup state
   const [isCreatingBackup, setIsCreatingBackup] = useState(false);
   const [backupProgress, setBackupProgress] = useState('');
+
+  // Bacheca clear state
+  const [isClearingBacheca, setIsClearingBacheca] = useState(false);
+  const [clearBachecaResult, setClearBachecaResult] = useState('');
 
   // Restore state
   const [isRestoring, setIsRestoring] = useState(false);
@@ -620,6 +624,21 @@ const Settings: React.FC<SettingsProps> = ({ settings, setSettings, role, users,
     }
   };
 
+  const handleClearBacheca = async () => {
+    if (!window.confirm('Vuoi eliminare TUTTE le note dalla bacheca? Questa operazione non è reversibile.')) return;
+    setIsClearingBacheca(true);
+    setClearBachecaResult('');
+    try {
+      await bacheca.clearAll();
+      setClearBachecaResult('Bacheca svuotata con successo!');
+    } catch (error) {
+      console.error('Errore pulizia bacheca:', error);
+      setClearBachecaResult(`Errore: ${error instanceof Error ? error.message : 'Errore sconosciuto'}`);
+    } finally {
+      setIsClearingBacheca(false);
+    }
+  };
+
   const handleAddType = async () => {
     if (!newType.name.trim()) return;
     try {
@@ -955,6 +974,41 @@ const Settings: React.FC<SettingsProps> = ({ settings, setSettings, role, users,
                 : 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800'
             }`}>
               {dedupeResult}
+            </div>
+          )}
+
+          {/* Pulisci Bacheca */}
+          <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 flex items-center justify-between">
+            <div>
+              <p className="font-medium text-gray-800 dark:text-gray-200">Pulisci Bacheca</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Elimina tutte le note dalla bacheca ({bacheca.note.length} note presenti).
+              </p>
+            </div>
+            <button
+              onClick={handleClearBacheca}
+              disabled={isClearingBacheca || bacheca.note.length === 0}
+              className="flex items-center gap-2 bg-red-600 hover:bg-red-500 disabled:bg-red-400 text-white px-4 py-2 rounded-md transition-colors text-sm font-medium min-w-[200px] justify-center"
+            >
+              {isClearingBacheca ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" /> Pulizia...
+                </>
+              ) : (
+                <>
+                  <Trash2 size={18} /> Pulisci Bacheca
+                </>
+              )}
+            </button>
+          </div>
+
+          {clearBachecaResult && (
+            <div className={`p-3 rounded-lg text-sm font-medium ${
+              clearBachecaResult.includes('Errore')
+                ? 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800'
+                : 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800'
+            }`}>
+              {clearBachecaResult}
             </div>
           )}
         </div>

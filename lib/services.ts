@@ -927,6 +927,15 @@ export const bachecaService = {
       .eq('completed', true);
 
     if (error) throw error;
+  },
+
+  async clearAll(): Promise<void> {
+    const { error } = await supabase
+      .from('bacheca')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000'); // Elimina tutte le note
+
+    if (error) throw error;
   }
 };
 
