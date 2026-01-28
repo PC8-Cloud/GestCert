@@ -62,6 +62,7 @@ export interface AppSettings {
     clock: boolean;
     calendar: boolean;
     expiry: boolean;
+    todoList: boolean;
   };
   smtp?: {
     server: string;
@@ -70,4 +71,16 @@ export interface AppSettings {
     user: string;
     senderEmail: string;
   };
+}
+
+export interface TodoItem {
+  id: string;
+  text: string;
+  completed: boolean;
+  createdAt: string;
+  createdBy: string;        // Nome operatore che ha creato
+  createdById: string;      // ID operatore che ha creato
+  completedAt?: string;     // Data completamento
+  completedBy?: string;     // Nome operatore che ha completato
+  completedById?: string;   // ID operatore che ha completato
 }

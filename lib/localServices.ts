@@ -524,3 +524,87 @@ export const localCertificateTypesService = {
     saveToStorage(LOCAL_STORAGE_KEYS.CERTIFICATE_TYPES, DEFAULT_CERTIFICATE_TYPES);
   }
 };
+
+// ============ LOCAL TODO SERVICE ============
+
+import { TodoItem } from '../types';
+
+export const localTodosService = {
+  async getAll(): Promise<TodoItem[]> {
+    const todos = getFromStorage<TodoItem[]>(LOCAL_STORAGE_KEYS.TODOS, []);
+    // Ordina: prima i non completati (per data creazione), poi i completati
+    return todos.sort((a, b) => {
+      if (a.completed !== b.completed) {
+        return a.completed ? 1 : -1;
+      }
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+  },
+
+  async create(
+    text: string,
+    operatorId: string,
+    operatorName: string
+  ): Promise<TodoItem> {
+    const todos = await this.getAll();
+
+    const newTodo: TodoItem = {
+      id: generateId(),
+      text,
+      completed: false,
+      createdAt: new Date().toISOString(),
+      createdBy: operatorName,
+      createdById: operatorId
+    };
+
+    todos.unshift(newTodo);
+    saveToStorage(LOCAL_STORAGE_KEYS.TODOS, todos);
+    return newTodo;
+  },
+
+  async toggle(
+    id: string,
+    operatorId: string,
+    operatorName: string
+  ): Promise<TodoItem> {
+    const todos = await this.getAll();
+    const index = todos.findIndex(t => t.id === id);
+    if (index === -1) throw new Error('Todo non trovato');
+
+    const todo = todos[index];
+    if (todo.completed) {
+      // Se era completato, lo riapre
+      todos[index] = {
+        ...todo,
+        completed: false,
+        completedAt: undefined,
+        completedBy: undefined,
+        completedById: undefined
+      };
+    } else {
+      // Se non era completato, lo completa
+      todos[index] = {
+        ...todo,
+        completed: true,
+        completedAt: new Date().toISOString(),
+        completedBy: operatorName,
+        completedById: operatorId
+      };
+    }
+
+    saveToStorage(LOCAL_STORAGE_KEYS.TODOS, todos);
+    return todos[index];
+  },
+
+  async delete(id: string): Promise<void> {
+    let todos = await this.getAll();
+    todos = todos.filter(t => t.id !== id);
+    saveToStorage(LOCAL_STORAGE_KEYS.TODOS, todos);
+  },
+
+  async clearCompleted(): Promise<void> {
+    let todos = await this.getAll();
+    todos = todos.filter(t => !t.completed);
+    saveToStorage(LOCAL_STORAGE_KEYS.TODOS, todos);
+  }
+};

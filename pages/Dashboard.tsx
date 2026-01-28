@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AppSettings, User, Operator } from '../types';
-import { Calendar as CalendarIcon, Clock, CheckCircle, FileText, ChevronLeft, ChevronRight, MessageSquare, Send, Trash2, UserPlus, UserCheck, Award, LogIn, Upload, UserMinus } from 'lucide-react';
+import { AppSettings, User, Operator, TodoItem } from '../types';
+import { Calendar as CalendarIcon, Clock, CheckCircle, FileText, ChevronLeft, ChevronRight, MessageSquare, Send, Trash2, UserPlus, UserCheck, Award, LogIn, Upload, UserMinus, ListTodo, Plus, Check, Circle } from 'lucide-react';
 import { NotaBacheca, Activity, ActivityType } from '../lib/hooks';
 import { formatDate } from '../lib/date';
 
@@ -69,12 +69,22 @@ interface ActivitiesHook {
   loading: boolean;
 }
 
+interface TodosHook {
+  todos: TodoItem[];
+  loading: boolean;
+  addTodo: (text: string, operatorId: string, operatorName: string) => Promise<TodoItem>;
+  toggleTodo: (id: string, operatorId: string, operatorName: string) => Promise<TodoItem>;
+  deleteTodo: (id: string) => Promise<void>;
+  clearCompleted: () => Promise<void>;
+}
+
 interface DashboardProps {
   user: { name: string };
   settings: AppSettings;
   users: User[];
   bacheca: BachecaHook;
   activities: ActivitiesHook;
+  todos: TodosHook;
   currentOperator: Operator;
 }
 
@@ -118,12 +128,14 @@ const formatRelativeTime = (dateStr: string): string => {
   return formatDate(date);
 };
 
-const Dashboard: React.FC<DashboardProps> = ({ user, settings, users, bacheca, activities, currentOperator }) => {
+const Dashboard: React.FC<DashboardProps> = ({ user, settings, users, bacheca, activities, todos, currentOperator }) => {
   const navigate = useNavigate();
   const [time, setTime] = useState(new Date());
   const [calendarDate, setCalendarDate] = useState(new Date());
   const [nuovaNota, setNuovaNota] = useState('');
   const [invioInCorso, setInvioInCorso] = useState(false);
+  const [nuovoTodo, setNuovoTodo] = useState('');
+  const [invioTodoInCorso, setInvioTodoInCorso] = useState(false);
 
   // Naviga alla pagina utenti con filtro certificati
   const goToUsersWithFilter = (filter: CertificateFilter) => {
@@ -507,6 +519,150 @@ const Dashboard: React.FC<DashboardProps> = ({ user, settings, users, bacheca, a
             </ul>
           </div>
       </div>
+
+      {/* Todo List Widget */}
+      {settings.widgets.todoList && (
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-primary dark:text-primary flex items-center">
+              <ListTodo size={20} className="mr-2"/>
+              Cose da Fare
+            </h3>
+            {todos.todos.filter(t => t.completed).length > 0 && (
+              <button
+                onClick={() => todos.clearCompleted()}
+                className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+              >
+                Pulisci completate
+              </button>
+            )}
+          </div>
+
+          {/* Form per nuovo todo */}
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!nuovoTodo.trim() || invioTodoInCorso) return;
+              setInvioTodoInCorso(true);
+              try {
+                await todos.addTodo(
+                  nuovoTodo.trim(),
+                  currentOperator.id,
+                  `${currentOperator.firstName} ${currentOperator.lastName}`
+                );
+                setNuovoTodo('');
+              } catch (err) {
+                console.error('Errore aggiunta todo:', err);
+              } finally {
+                setInvioTodoInCorso(false);
+              }
+            }}
+            className="mb-4 flex gap-2"
+          >
+            <input
+              type="text"
+              value={nuovoTodo}
+              onChange={(e) => setNuovoTodo(e.target.value)}
+              placeholder="Aggiungi una cosa da fare..."
+              className="flex-1 px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+              maxLength={200}
+            />
+            <button
+              type="submit"
+              disabled={!nuovoTodo.trim() || invioTodoInCorso}
+              className="px-3 py-2 bg-primary hover:bg-secondary text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <Plus size={18} />
+            </button>
+          </form>
+
+          {/* Lista todo */}
+          <ul className="space-y-2 max-h-64 overflow-y-auto">
+            {todos.loading ? (
+              <li className="text-sm text-gray-400 italic">Caricamento...</li>
+            ) : todos.todos.length === 0 ? (
+              <li className="text-sm text-gray-400 italic text-center py-4">
+                Nessuna attività in lista.
+                <br />
+                <span className="text-xs">Aggiungi qualcosa da fare!</span>
+              </li>
+            ) : (
+              todos.todos.map(todo => (
+                <li
+                  key={todo.id}
+                  className={`flex items-center gap-3 p-2 rounded-lg group transition-colors ${
+                    todo.completed
+                      ? 'bg-green-50 dark:bg-green-900/20'
+                      : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                  }`}
+                >
+                  {/* Checkbox */}
+                  <button
+                    onClick={() => todos.toggleTodo(
+                      todo.id,
+                      currentOperator.id,
+                      `${currentOperator.firstName} ${currentOperator.lastName}`
+                    )}
+                    className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                      todo.completed
+                        ? 'bg-green-500 border-green-500 text-white'
+                        : 'border-gray-300 dark:border-gray-500 hover:border-primary'
+                    }`}
+                    title={todo.completed && todo.completedBy
+                      ? `Completato da ${todo.completedBy} il ${formatDate(todo.completedAt || '')}`
+                      : 'Segna come completato'
+                    }
+                  >
+                    {todo.completed && <Check size={12} />}
+                  </button>
+
+                  {/* Testo todo con tooltip */}
+                  <div className="flex-1 min-w-0 relative group/text">
+                    <p className={`text-sm ${
+                      todo.completed
+                        ? 'text-gray-400 line-through'
+                        : 'text-gray-800 dark:text-gray-200'
+                    }`}>
+                      {todo.text}
+                    </p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500">
+                      {todo.createdBy} · {formatDate(todo.createdAt)}
+                    </p>
+
+                    {/* Tooltip chi ha completato */}
+                    {todo.completed && todo.completedBy && (
+                      <div className="absolute left-0 bottom-full mb-1 hidden group-hover/text:block z-10">
+                        <div className="bg-gray-800 text-white text-xs rounded px-2 py-1 whitespace-nowrap shadow-lg">
+                          Completato da <strong>{todo.completedBy}</strong>
+                          <br />
+                          {todo.completedAt && formatDate(todo.completedAt)}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Pulsante elimina */}
+                  <button
+                    onClick={() => todos.deleteTodo(todo.id)}
+                    className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 transition-all flex-shrink-0"
+                    title="Elimina"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </li>
+              ))
+            )}
+          </ul>
+
+          {/* Contatore */}
+          {todos.todos.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400 flex justify-between">
+              <span>{todos.todos.filter(t => !t.completed).length} da completare</span>
+              <span>{todos.todos.filter(t => t.completed).length} completate</span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
