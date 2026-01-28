@@ -310,13 +310,8 @@ export const localBachecaService = {
       console.log(`[Bacheca] Rimosse ${beforeCleanup - note.length} note completate più vecchie di 60 giorni`);
     }
 
-    // Ordina: prima non completate (per data), poi completate
-    return note.sort((a, b) => {
-      if (a.completed !== b.completed) {
-        return a.completed ? 1 : -1;
-      }
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    });
+    // Ordina solo per data (più recenti prima)
+    return note.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   },
 
   async create(contenuto: string, operatoreId: string, operatoreNome: string): Promise<NotaBacheca> {

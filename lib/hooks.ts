@@ -386,11 +386,7 @@ export function useBacheca() {
   const toggleNota = async (id: string, operatoreId: string, operatoreNome: string) => {
     try {
       const updated = await bachecaApi.toggle(id, operatoreId, operatoreNome);
-      setNote(prev => {
-        const newList = prev.map(n => n.id === id ? updated : n);
-        // Riordina: non completate prima, poi completate
-        return [...newList.filter(n => !n.completed), ...newList.filter(n => n.completed)];
-      });
+      setNote(prev => prev.map(n => n.id === id ? updated : n));
       return updated;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Errore nel toggle nota');

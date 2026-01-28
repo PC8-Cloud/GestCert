@@ -831,11 +831,10 @@ export const bachecaService = {
       console.warn('[Bacheca] Errore pulizia note vecchie:', cleanupError.message);
     }
 
-    // Recupera le note
+    // Recupera le note (ordinate per data, più recenti prima)
     const { data, error } = await supabase
       .from('bacheca')
       .select('*')
-      .order('completed', { ascending: true })  // Prima non completate
       .order('created_at', { ascending: false })
       .limit(30);
 

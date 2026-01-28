@@ -393,34 +393,31 @@ const Dashboard: React.FC<DashboardProps> = ({ user, settings, users, bacheca, a
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
-            <h3 className="text-lg font-semibold mb-4 dark:text-white flex items-center">
-              <Clock size={20} className="mr-2 text-primary" />
+          {/* Card Attività Recenti */}
+          <div className="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col h-64">
+            <h3 className="text-base font-semibold mb-3 dark:text-white flex items-center">
+              <Clock size={18} className="mr-2 text-primary" />
               Attività Recenti
             </h3>
-            <ul className="space-y-3 max-h-40 overflow-y-auto">
+            <ul className="space-y-2 flex-1 overflow-y-auto">
               {activities.loading ? (
                 <li className="text-sm text-gray-400 italic">Caricamento...</li>
               ) : activities.activities.length === 0 ? (
                 <li className="text-sm text-gray-400 italic text-center py-4">
                   Nessuna attività registrata.
-                  <br />
-                  <span className="text-xs">Le attività appariranno quando crei o modifichi utenti e certificati.</span>
                 </li>
               ) : (
                 activities.activities.map(activity => (
-                  <li key={activity.id} className="flex items-start pb-3 border-b border-gray-50 dark:border-gray-700 last:border-0 last:pb-0">
-                    <div className="bg-primary/10 p-2 rounded-full mr-3 text-primary flex-shrink-0">
+                  <li key={activity.id} className="flex items-center gap-2 py-1">
+                    <div className="bg-primary/10 p-1.5 rounded-full text-primary flex-shrink-0">
                       {getActivityIcon(activity.type)}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                      <p className="text-sm text-gray-800 dark:text-gray-200 truncate">
                         {activity.description}
-                        {activity.targetName && (
-                          <span className="font-semibold"> {activity.targetName}</span>
-                        )}
+                        {activity.targetName && <span className="font-medium"> {activity.targetName}</span>}
                       </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                      <p className="text-xs text-gray-400">
                         {formatRelativeTime(activity.createdAt)} · {activity.operatorName}
                       </p>
                     </div>
@@ -429,16 +426,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, settings, users, bacheca, a
               )}
             </ul>
           </div>
-          
-           <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-primary dark:text-primary flex items-center">
-                <MessageSquare size={20} className="mr-2"/>
-                Bacheca e Attività
-              </h3>
-            </div>
 
-            {/* Form per nuova nota */}
+          {/* Card Bacheca */}
+          <div className="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col h-64">
+            <h3 className="text-base font-semibold mb-3 text-primary flex items-center">
+              <MessageSquare size={18} className="mr-2"/>
+              Bacheca
+            </h3>
+
+            {/* Form compatto */}
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
@@ -457,102 +453,71 @@ const Dashboard: React.FC<DashboardProps> = ({ user, settings, users, bacheca, a
                   setInvioInCorso(false);
                 }
               }}
-              className="mb-4 flex gap-2"
+              className="mb-3 flex gap-2"
             >
               <input
                 type="text"
                 value={nuovaNota}
                 onChange={(e) => setNuovaNota(e.target.value)}
-                placeholder="Aggiungi nota o attività da fare..."
-                className="flex-1 px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                placeholder="Nuova attività..."
+                className="flex-1 px-3 py-1.5 text-sm border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
                 maxLength={500}
               />
               <button
                 type="submit"
                 disabled={!nuovaNota.trim() || invioInCorso}
-                className="px-3 py-2 bg-primary hover:bg-secondary text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-2.5 py-1.5 bg-primary hover:bg-secondary text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                <Send size={18} />
+                <Send size={16} />
               </button>
             </form>
 
             {/* Lista note */}
-            <ul className="space-y-2 max-h-40 overflow-y-auto">
+            <ul className="space-y-1 flex-1 overflow-y-auto">
               {bacheca.loading ? (
                 <li className="text-sm text-gray-400 italic">Caricamento...</li>
               ) : bacheca.note.length === 0 ? (
                 <li className="text-sm text-gray-400 italic text-center py-4">
                   Nessuna nota in bacheca.
-                  <br />
-                  <span className="text-xs">Scrivi qualcosa per te o per il team!</span>
                 </li>
               ) : (
                 bacheca.note.map(nota => (
-                  <li
-                    key={nota.id}
-                    className={`flex items-center gap-3 p-2 rounded-lg group transition-colors ${
-                      nota.completed
-                        ? 'bg-green-50 dark:bg-green-900/20'
-                        : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                    }`}
-                  >
-                    {/* Checkbox per completare */}
+                  <li key={nota.id} className="flex items-center gap-2 py-1 group">
+                    {/* Checkbox */}
                     <button
                       onClick={() => bacheca.toggleNota(
                         nota.id,
                         currentOperator.id,
                         `${currentOperator.firstName} ${currentOperator.lastName}`
                       )}
-                      className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                      className={`flex-shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${
                         nota.completed
                           ? 'bg-green-500 border-green-500 text-white'
-                          : 'border-gray-300 dark:border-gray-500 hover:border-primary'
+                          : 'border-gray-300 hover:border-primary'
                       }`}
                       title={nota.completed && nota.completedBy
-                        ? `Completato da ${nota.completedBy}`
+                        ? `Fatto da ${nota.completedBy} il ${formatDate(nota.completedAt || '')}`
                         : 'Segna come fatto'
                       }
                     >
-                      {nota.completed && <Check size={12} />}
+                      {nota.completed && <Check size={10} />}
                     </button>
 
-                    {/* Contenuto nota */}
-                    <div className="flex-1 min-w-0 relative group/text">
-                      <p className={`text-sm break-words ${
-                        nota.completed
-                          ? 'text-gray-400 line-through'
-                          : 'text-gray-800 dark:text-gray-200'
+                    {/* Contenuto */}
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm truncate ${
+                        nota.completed ? 'text-gray-400 line-through' : 'text-gray-800 dark:text-gray-200'
                       }`}>
                         {nota.contenuto}
                       </p>
-                      <p className="text-xs text-gray-400 dark:text-gray-500">
+                      <p className="text-xs text-gray-400">
                         {nota.operatoreNome} · {formatDate(nota.createdAt)}
                       </p>
-
-                      {/* Tooltip chi ha completato */}
-                      {nota.completed && nota.completedBy && (
-                        <div className="absolute left-0 bottom-full mb-1 hidden group-hover/text:block z-10">
-                          <div className="bg-gray-800 text-white text-xs rounded px-2 py-1 whitespace-nowrap shadow-lg">
-                            <CheckCircle size={12} className="inline mr-1" />
-                            Fatto da <strong>{nota.completedBy}</strong>
-                            <br />
-                            {nota.completedAt && formatDate(nota.completedAt)}
-                          </div>
-                        </div>
-                      )}
                     </div>
                   </li>
                 ))
               )}
             </ul>
-
-            {/* Contatore */}
-            {bacheca.note.length > 0 && (
-              <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400 flex justify-between">
-                <span>{bacheca.note.filter(n => !n.completed).length} da fare</span>
-                <span>{bacheca.note.filter(n => n.completed).length} completate</span>
-              </div>
-            )}
           </div>
       </div>
     </div>
