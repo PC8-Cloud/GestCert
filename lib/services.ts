@@ -817,11 +817,27 @@ export interface NotaBacheca {
 
 export const bachecaService = {
   async getAll(): Promise<NotaBacheca[]> {
+    // Pulizia automatica: elimina note completate più vecchie di 60 giorni
+    const sixtyDaysAgo = new Date();
+    sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+
+    const { error: cleanupError } = await supabase
+      .from('bacheca')
+      .delete()
+      .eq('completed', true)
+      .lt('completed_at', sixtyDaysAgo.toISOString());
+
+    if (cleanupError) {
+      console.warn('[Bacheca] Errore pulizia note vecchie:', cleanupError.message);
+    }
+
+    // Recupera le note
     const { data, error } = await supabase
       .from('bacheca')
       .select('*')
+      .order('completed', { ascending: true })  // Prima non completate
       .order('created_at', { ascending: false })
-      .limit(20); // Ultime 20 note
+      .limit(30);
 
     if (error) throw error;
     return (data || []).map(mapDbNotaToNota);

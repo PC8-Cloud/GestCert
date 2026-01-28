@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppSettings, User, Operator } from '../types';
-import { Calendar as CalendarIcon, Clock, CheckCircle, FileText, ChevronLeft, ChevronRight, MessageSquare, Send, Trash2, UserPlus, UserCheck, Award, LogIn, Upload, UserMinus, Check } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, CheckCircle, FileText, ChevronLeft, ChevronRight, MessageSquare, Send, UserPlus, UserCheck, Award, LogIn, Upload, UserMinus, Check } from 'lucide-react';
 import { NotaBacheca, Activity, ActivityType } from '../lib/hooks';
 import { formatDate } from '../lib/date';
 
@@ -61,9 +61,7 @@ interface BachecaHook {
   note: NotaBacheca[];
   loading: boolean;
   addNota: (contenuto: string, operatoreId: string, operatoreNome: string) => Promise<NotaBacheca>;
-  deleteNota: (id: string) => Promise<void>;
   toggleNota: (id: string, operatoreId: string, operatoreNome: string) => Promise<NotaBacheca>;
-  clearCompleted: () => Promise<void>;
 }
 
 interface ActivitiesHook {
@@ -438,14 +436,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, settings, users, bacheca, a
                 <MessageSquare size={20} className="mr-2"/>
                 Bacheca e Attività
               </h3>
-              {bacheca.note.filter(n => n.completed).length > 0 && (
-                <button
-                  onClick={() => bacheca.clearCompleted()}
-                  className="text-xs text-gray-400 hover:text-red-500 transition-colors"
-                >
-                  Pulisci completate
-                </button>
-              )}
             </div>
 
             {/* Form per nuova nota */}
@@ -551,15 +541,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, settings, users, bacheca, a
                         </div>
                       )}
                     </div>
-
-                    {/* Pulsante elimina */}
-                    <button
-                      onClick={() => bacheca.deleteNota(nota.id)}
-                      className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 transition-all flex-shrink-0"
-                      title="Elimina"
-                    >
-                      <Trash2 size={14} />
-                    </button>
                   </li>
                 ))
               )}

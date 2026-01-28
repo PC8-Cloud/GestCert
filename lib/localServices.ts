@@ -292,7 +292,24 @@ export interface NotaBacheca {
 
 export const localBachecaService = {
   async getAll(): Promise<NotaBacheca[]> {
-    const note = getFromStorage<NotaBacheca[]>(LOCAL_STORAGE_KEYS.BACHECA, []);
+    let note = getFromStorage<NotaBacheca[]>(LOCAL_STORAGE_KEYS.BACHECA, []);
+
+    // Pulizia automatica: rimuovi note completate più vecchie di 60 giorni
+    const sixtyDaysAgo = new Date();
+    sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+    const beforeCleanup = note.length;
+
+    note = note.filter(n => {
+      if (!n.completed || !n.completedAt) return true;
+      return new Date(n.completedAt) > sixtyDaysAgo;
+    });
+
+    // Se abbiamo rimosso qualcosa, salva
+    if (note.length < beforeCleanup) {
+      saveToStorage(LOCAL_STORAGE_KEYS.BACHECA, note);
+      console.log(`[Bacheca] Rimosse ${beforeCleanup - note.length} note completate più vecchie di 60 giorni`);
+    }
+
     // Ordina: prima non completate (per data), poi completate
     return note.sort((a, b) => {
       if (a.completed !== b.completed) {
