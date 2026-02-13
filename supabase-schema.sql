@@ -290,3 +290,62 @@ ON CONFLICT (key) DO NOTHING;
 INSERT INTO operators (first_name, last_name, email, role, status)
 VALUES ('Maria', 'Segreteria', 'segreteria@cassaedile.ag.it', 'Segreteria', 'Attivo')
 ON CONFLICT (email) DO NOTHING;
+
+-- ============ IMPRESE EDILI ============
+
+-- Tabella imprese edili
+CREATE TABLE IF NOT EXISTS companies (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  partita_iva TEXT NOT NULL,
+  ragione_sociale TEXT NOT NULL,
+  forma_giuridica TEXT,
+  codice_fiscale TEXT,
+  codice_rea TEXT,
+  pec TEXT,
+  email TEXT,
+  phone TEXT,
+  mobile TEXT,
+  address TEXT,
+  house_number TEXT,
+  zip_code TEXT,
+  city TEXT,
+  province TEXT,
+  codice_ateco TEXT,
+  notes TEXT,
+  status TEXT DEFAULT 'Attivo' CHECK (status IN ('Attivo', 'Sospeso', 'Bloccato')),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Tabella documenti aziendali (DURC, visura camerale, ecc.)
+CREATE TABLE IF NOT EXISTS company_documents (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  issue_date DATE,
+  expiry_date DATE,
+  file_url TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Indici per imprese edili
+CREATE UNIQUE INDEX IF NOT EXISTS idx_companies_partita_iva ON companies(partita_iva);
+CREATE INDEX IF NOT EXISTS idx_companies_ragione_sociale ON companies(ragione_sociale);
+CREATE INDEX IF NOT EXISTS idx_companies_status ON companies(status);
+CREATE INDEX IF NOT EXISTS idx_company_documents_company_id ON company_documents(company_id);
+CREATE INDEX IF NOT EXISTS idx_company_documents_expiry_date ON company_documents(expiry_date);
+
+-- RLS per imprese edili
+ALTER TABLE companies ENABLE ROW LEVEL SECURITY;
+ALTER TABLE company_documents ENABLE ROW LEVEL SECURITY;
+
+-- Policy per imprese (stesso pattern di users)
+CREATE POLICY "Companies access for authenticated" ON companies
+  FOR ALL USING (auth.role() = 'authenticated') WITH CHECK (auth.role() = 'authenticated');
+
+CREATE POLICY "Company documents access for authenticated" ON company_documents
+  FOR ALL USING (auth.role() = 'authenticated') WITH CHECK (auth.role() = 'authenticated');
+
+-- Collegamento lavoratori ↔ imprese edili
+ALTER TABLE users ADD COLUMN IF NOT EXISTS company_id UUID REFERENCES companies(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_users_company_id ON users(company_id);

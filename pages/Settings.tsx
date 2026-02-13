@@ -131,7 +131,7 @@ const Settings: React.FC<SettingsProps> = ({ settings, setSettings, role, users,
       const manifest = JSON.parse(manifestContent);
 
       // Restore users with certificates
-      setRestoreProgress('Elaborazione utenti e certificati...');
+      setRestoreProgress('Elaborazione lavoratori e certificati...');
       const usersFromBackup: User[] = manifest.users || [];
 
       // Process users and restore certificate files from ZIP
@@ -204,11 +204,11 @@ const Settings: React.FC<SettingsProps> = ({ settings, setSettings, role, users,
 
       // Ripristino su Supabase
       if (STORAGE_MODE === 'supabase') {
-        setRestoreProgress(`Salvataggio ${processedUsers.length} utenti su Supabase...`);
+        setRestoreProgress(`Salvataggio ${processedUsers.length} lavoratori su Supabase...`);
         const usersResult = await restoreService.restoreUsers(processedUsers);
 
         // Mostra risultato dettagliato
-        let resultMessage = `Utenti ripristinati: ${usersResult.success}/${processedUsers.length}`;
+        let resultMessage = `Lavoratori ripristinati: ${usersResult.success}/${processedUsers.length}`;
 
         if (usersResult.errors.length > 0) {
           console.warn('Errori durante il ripristino utenti:', usersResult.errors);
@@ -242,8 +242,8 @@ const Settings: React.FC<SettingsProps> = ({ settings, setSettings, role, users,
 
         // Messaggio finale con dettagli
         const finalMessage = usersResult.success > 0
-          ? `Ripristino completato! ${usersResult.success} utenti ripristinati.${usersResult.errors.length > 0 ? ` (${usersResult.errors.length} errori - vedi console)` : ''}`
-          : `Ripristino fallito! Nessun utente ripristinato. Errori: ${usersResult.errors.slice(0, 3).join('; ')}`;
+          ? `Ripristino completato! ${usersResult.success} lavoratori ripristinati.${usersResult.errors.length > 0 ? ` (${usersResult.errors.length} errori - vedi console)` : ''}`
+          : `Ripristino fallito! Nessun lavoratore ripristinato. Errori: ${usersResult.errors.slice(0, 3).join('; ')}`;
 
         setRestoreProgress(finalMessage);
 
@@ -460,7 +460,7 @@ const Settings: React.FC<SettingsProps> = ({ settings, setSettings, role, users,
       zip.file('gestcert_backup.json', JSON.stringify(backupData, null, 2));
 
       // Crea cartelle per ogni utente con i certificati
-      setBackupProgress('Elaborazione certificati utenti...');
+      setBackupProgress('Elaborazione certificati lavoratori...');
 
       const usersFolder = zip.folder('utenti');
       let totalCertsSaved = 0;
@@ -614,7 +614,7 @@ const Settings: React.FC<SettingsProps> = ({ settings, setSettings, role, users,
       if (result.removed === 0) {
         setDedupeResult('Nessun duplicato trovato.');
       } else {
-        setDedupeResult(`Rimossi ${result.removed} duplicati in ${result.usersAffected} utenti.`);
+        setDedupeResult(`Rimossi ${result.removed} duplicati in ${result.usersAffected} lavoratori.`);
       }
     } catch (error) {
       console.error('Errore rimozione duplicati:', error);
@@ -713,20 +713,20 @@ const Settings: React.FC<SettingsProps> = ({ settings, setSettings, role, users,
       {/* Import/Export */}
       <section className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 p-6">
         <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-4 flex items-center">
-          <FileSpreadsheet className="mr-2" size={20} /> Import/Export Utenti
+          <FileSpreadsheet className="mr-2" size={20} /> Import/Export Lavoratori
         </h2>
         <div className="space-y-4">
           <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
             <div className="flex items-start gap-3">
               <Info className="text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" size={20} />
               <div className="text-sm text-blue-800 dark:text-blue-200">
-                <p className="font-medium mb-1">Come importare utenti da Excel</p>
+                <p className="font-medium mb-1">Come importare lavoratori da Excel</p>
                 <ol className="list-decimal list-inside space-y-1 text-blue-700 dark:text-blue-300">
                   <li>Scarica il modello CSV qui sotto</li>
                   <li>Apri il file con Excel o LibreOffice Calc</li>
-                  <li>Compila i dati degli utenti (una riga per utente)</li>
+                  <li>Compila i dati dei lavoratori (una riga per lavoratore)</li>
                   <li>Salva il file mantenendo il formato CSV (separatore: punto e virgola)</li>
-                  <li>Vai nella sezione Utenti e clicca su "Importa"</li>
+                  <li>Vai nella sezione Lavoratori e clicca su "Importa"</li>
                 </ol>
               </div>
             </div>
@@ -734,12 +734,12 @@ const Settings: React.FC<SettingsProps> = ({ settings, setSettings, role, users,
 
           <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
             <div>
-              <p className="font-medium text-gray-800 dark:text-gray-200">Modello Importazione Utenti</p>
+              <p className="font-medium text-gray-800 dark:text-gray-200">Modello Importazione Lavoratori</p>
               <p className="text-sm text-gray-500 dark:text-gray-400">File CSV con intestazioni e 2 righe di esempio</p>
             </div>
             <a
-              href="/template_importazione_utenti.csv"
-              download="template_importazione_utenti.csv"
+              href="/template_importazione_lavoratori.csv"
+              download="template_importazione_lavoratori.csv"
               className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-md transition-colors text-sm font-medium"
             >
               <Download size={18} /> Scarica Modello
@@ -768,7 +768,7 @@ const Settings: React.FC<SettingsProps> = ({ settings, setSettings, role, users,
               <div className="text-sm text-amber-800 dark:text-amber-200">
                 <p className="font-medium mb-1">Cosa include il backup</p>
                 <ul className="list-disc list-inside space-y-1 text-amber-700 dark:text-amber-300">
-                  <li>Tutti gli utenti con i loro dati anagrafici</li>
+                  <li>Tutti i lavoratori con i loro dati anagrafici</li>
                   <li>Tutti i certificati e documenti allegati (in PDF)</li>
                   <li>Operatori e impostazioni</li>
                   <li>Note bacheca e registro attività</li>
@@ -785,7 +785,7 @@ const Settings: React.FC<SettingsProps> = ({ settings, setSettings, role, users,
                 Scarica un file ZIP con tutti i dati e documenti
               </p>
               <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                Struttura: cartella per ogni utente con i certificati allegati
+                Struttura: cartella per ogni lavoratore con i certificati allegati
               </p>
             </div>
             <button
@@ -902,7 +902,7 @@ const Settings: React.FC<SettingsProps> = ({ settings, setSettings, role, users,
                 </p>
                 <ul className="text-sm space-y-1 ml-4">
                   <li className="text-gray-700 dark:text-gray-200">
-                    <strong>{restoreStats.users}</strong> utenti
+                    <strong>{restoreStats.users}</strong> lavoratori
                   </li>
                   <li className="text-gray-700 dark:text-gray-200">
                     <strong>{restoreStats.certs}</strong> certificati
@@ -1422,8 +1422,8 @@ const Settings: React.FC<SettingsProps> = ({ settings, setSettings, role, users,
             {/* Notify users */}
             <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
               <div>
-                <p className="font-medium text-gray-800 dark:text-gray-200">Notifica anche gli utenti</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Invia email agli utenti per i loro certificati in scadenza</p>
+                <p className="font-medium text-gray-800 dark:text-gray-200">Notifica anche i lavoratori</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Invia email ai lavoratori per i loro certificati in scadenza</p>
               </div>
               <input
                 type="checkbox"
@@ -1447,19 +1447,19 @@ const Settings: React.FC<SettingsProps> = ({ settings, setSettings, role, users,
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <p className="text-xs font-semibold text-gray-600 dark:text-gray-300">Email utente (certificato in scadenza)</p>
+                  <p className="text-xs font-semibold text-gray-600 dark:text-gray-300">Email lavoratore (certificato in scadenza)</p>
                   <input
                     type="text"
                     value={emailTemplates.user_expiry.subject}
                     onChange={e => handleTemplateChange('user_expiry', 'subject', e.target.value)}
                     className="w-full p-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded text-sm"
-                    placeholder="Oggetto email utente"
+                    placeholder="Oggetto email lavoratore"
                   />
                   <textarea
                     value={emailTemplates.user_expiry.body}
                     onChange={e => handleTemplateChange('user_expiry', 'body', e.target.value)}
                     className="w-full p-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded text-sm min-h-[120px]"
-                    placeholder="Testo email utente"
+                    placeholder="Testo email lavoratore"
                   />
                   <p className="text-xs text-gray-400">
                     Variabili: {'{{firstName}}'}, {'{{lastName}}'}, {'{{certificateName}}'}, {'{{expiryDate}}'}, {'{{daysUntilExpiry}}'}, {'{{certList}}'}

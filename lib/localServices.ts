@@ -1,6 +1,6 @@
-import { User, Certificate, Operator, AppSettings } from '../types';
+import { User, Certificate, Operator, AppSettings, ImpresaEdile, CompanyDocument } from '../types';
 import { LOCAL_STORAGE_KEYS } from './config';
-import { MOCK_USERS, MOCK_OPERATORS } from '../constants';
+import { MOCK_USERS, MOCK_OPERATORS, MOCK_COMPANIES } from '../constants';
 import { hashPassword, verifyPassword } from './password';
 
 // ============ RESET FUNCTION ============
@@ -89,7 +89,7 @@ export const localUsersService = {
   async update(id: string, userData: Partial<User>): Promise<User> {
     const users = await this.getAll();
     const index = users.findIndex(u => u.id === id);
-    if (index === -1) throw new Error('Utente non trovato');
+    if (index === -1) throw new Error('Lavoratore non trovato');
 
     users[index] = { ...users[index], ...userData };
     saveToStorage(LOCAL_STORAGE_KEYS.USERS, users);
@@ -109,13 +109,68 @@ export const localUsersService = {
   }
 };
 
+// ============ LOCAL COMPANIES SERVICE ============
+
+export const localCompaniesService = {
+  async getAll(): Promise<ImpresaEdile[]> {
+    const companies = getFromStorage<ImpresaEdile[]>(LOCAL_STORAGE_KEYS.COMPANIES, MOCK_COMPANIES);
+    return companies.sort((a, b) => a.ragioneSociale.localeCompare(b.ragioneSociale, 'it'));
+  },
+
+  async getById(id: string): Promise<ImpresaEdile | null> {
+    const companies = await this.getAll();
+    return companies.find(c => c.id === id) || null;
+  },
+
+  async checkPartitaIvaExists(piva: string, excludeId?: string): Promise<boolean> {
+    const companies = await this.getAll();
+    const cleaned = piva.replace(/[\s.\-]/g, '');
+    return companies.some(c => c.partitaIva.replace(/[\s.\-]/g, '') === cleaned && c.id !== excludeId);
+  },
+
+  async create(company: Omit<ImpresaEdile, 'id'>): Promise<ImpresaEdile> {
+    const companies = await this.getAll();
+    const newCompany: ImpresaEdile = {
+      ...company,
+      id: generateId(),
+      documents: company.documents || [],
+      createdAt: new Date().toISOString(),
+    };
+    companies.push(newCompany);
+    saveToStorage(LOCAL_STORAGE_KEYS.COMPANIES, companies);
+    return newCompany;
+  },
+
+  async update(id: string, data: Partial<ImpresaEdile>): Promise<ImpresaEdile> {
+    const companies = await this.getAll();
+    const index = companies.findIndex(c => c.id === id);
+    if (index === -1) throw new Error('Impresa non trovata');
+
+    companies[index] = { ...companies[index], ...data };
+    saveToStorage(LOCAL_STORAGE_KEYS.COMPANIES, companies);
+    return companies[index];
+  },
+
+  async delete(id: string): Promise<void> {
+    let companies = await this.getAll();
+    companies = companies.filter(c => c.id !== id);
+    saveToStorage(LOCAL_STORAGE_KEYS.COMPANIES, companies);
+  },
+
+  async deleteMany(ids: string[]): Promise<void> {
+    let companies = await this.getAll();
+    companies = companies.filter(c => !ids.includes(c.id));
+    saveToStorage(LOCAL_STORAGE_KEYS.COMPANIES, companies);
+  }
+};
+
 // ============ LOCAL CERTIFICATES SERVICE ============
 
 export const localCertificatesService = {
   async create(userId: string, cert: Omit<Certificate, 'id'>): Promise<Certificate> {
     const users = getFromStorage<User[]>(LOCAL_STORAGE_KEYS.USERS, MOCK_USERS);
     const userIndex = users.findIndex(u => u.id === userId);
-    if (userIndex === -1) throw new Error('Utente non trovato');
+    if (userIndex === -1) throw new Error('Lavoratore non trovato');
 
     const newCert: Certificate = {
       ...cert,
@@ -401,7 +456,12 @@ export type ActivityType =
   | 'certificate_added'
   | 'certificate_deleted'
   | 'operator_created'
-  | 'operator_login';
+  | 'operator_login'
+  | 'company_created'
+  | 'company_updated'
+  | 'company_deleted'
+  | 'document_added'
+  | 'document_deleted';
 
 export interface Activity {
   id: string;
@@ -415,14 +475,19 @@ export interface Activity {
 
 // Labels per i tipi di attività
 export const ACTIVITY_LABELS: Record<ActivityType, string> = {
-  user_created: 'Utente creato',
-  user_updated: 'Utente modificato',
-  user_deleted: 'Utente eliminato',
-  user_imported: 'Utenti importati',
+  user_created: 'Lavoratore creato',
+  user_updated: 'Lavoratore modificato',
+  user_deleted: 'Lavoratore eliminato',
+  user_imported: 'Lavoratori importati',
   certificate_added: 'Certificato aggiunto',
   certificate_deleted: 'Certificato eliminato',
   operator_created: 'Operatore creato',
   operator_login: 'Accesso effettuato',
+  company_created: 'Impresa creata',
+  company_updated: 'Impresa modificata',
+  company_deleted: 'Impresa eliminata',
+  document_added: 'Documento aggiunto',
+  document_deleted: 'Documento rimosso',
 };
 
 export const localActivitiesService = {

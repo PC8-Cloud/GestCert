@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams, useLocation } from 'react-router-dom';
-import { User, UserStatus, Role, Certificate } from '../types';
-import { Search, Plus, Upload, Lock, Unlock, Edit, Trash2, Save, X, Eye, Download, ChevronDown, ChevronUp, AlertCircle, FileText, CheckCircle, XCircle } from 'lucide-react';
+import { User, UserStatus, Role, Certificate, ImpresaEdile } from '../types';
+import { Search, Plus, Upload, Lock, Unlock, Edit, Trash2, Save, X, Eye, Download, ChevronDown, ChevronUp, AlertCircle, FileText, CheckCircle, XCircle, Building2 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import AddressAutocomplete from '../components/AddressAutocomplete';
 import { CertificateFilter } from './Dashboard';
@@ -185,9 +185,10 @@ interface UsersProps {
   deleteUser: (id: string) => Promise<void>;
   deleteUsers: (ids: string[]) => Promise<void>;
   currentUserRole: Role;
+  companies: ImpresaEdile[];
 }
 
-const Users: React.FC<UsersProps> = ({ users, setUsers, createUser, updateUser, deleteUser, deleteUsers, currentUserRole }) => {
+const Users: React.FC<UsersProps> = ({ users, setUsers, createUser, updateUser, deleteUser, deleteUsers, currentUserRole, companies }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const [view, setView] = useState<'list' | 'edit' | 'create'>('list');
@@ -408,7 +409,7 @@ const Users: React.FC<UsersProps> = ({ users, setUsers, createUser, updateUser, 
   };
   
   const handleDelete = async (id: string) => {
-    if (window.confirm('Sei sicuro di voler eliminare questo utente?')) {
+    if (window.confirm('Sei sicuro di voler eliminare questo lavoratore?')) {
       try {
         await deleteUser(id);
       } catch (error) {
@@ -628,7 +629,7 @@ const Users: React.FC<UsersProps> = ({ users, setUsers, createUser, updateUser, 
                 Filtro attivo: <span className="font-bold">{certFilterLabels[certFilter]}</span>
               </span>
               <span className="text-amber-600 dark:text-amber-300">
-                ({filteredUsers.length} utenti trovati)
+                ({filteredUsers.length} lavoratori trovati)
               </span>
             </div>
             <button
@@ -651,7 +652,7 @@ const Users: React.FC<UsersProps> = ({ users, setUsers, createUser, updateUser, 
                 {currentUserRole === Role.ADMIN && (
                   <button
                     onClick={async () => {
-                      if (window.confirm(`Eliminare ${selectedIds.size} utenti selezionati?`)) {
+                      if (window.confirm(`Eliminare ${selectedIds.size} lavoratori selezionati?`)) {
                         try {
                           await deleteUsers(Array.from(selectedIds));
                           setSelectedIds(new Set());
@@ -690,7 +691,7 @@ const Users: React.FC<UsersProps> = ({ users, setUsers, createUser, updateUser, 
                   onClick={() => importFileRef.current?.click()}
                   disabled={isImporting}
                   className="flex items-center gap-2 bg-green-600 hover:bg-green-500 disabled:bg-green-400 text-white px-4 py-2 rounded-md transition-colors text-sm font-medium relative group"
-                  title="Importa utenti da file Excel (.xlsx o .csv). Scarica il modello dalla sezione Impostazioni."
+                  title="Importa lavoratori da file Excel (.xlsx o .csv). Scarica il modello dalla sezione Impostazioni."
                 >
                   <Upload size={18} className={isImporting ? 'animate-pulse' : ''} />
                   {isImporting ? 'Importazione...' : 'Importa'}
@@ -744,7 +745,7 @@ const Users: React.FC<UsersProps> = ({ users, setUsers, createUser, updateUser, 
                   />
                 </th>
                 <th className="p-4">Stato</th>
-                <th className="p-4">Utente</th>
+                <th className="p-4">Lavoratore</th>
                 <th className="p-4">Codice Fiscale</th>
                 <th className="p-4">Città</th>
                 <th className="p-4">Email</th>
@@ -830,13 +831,13 @@ const Users: React.FC<UsersProps> = ({ users, setUsers, createUser, updateUser, 
               ))}
               {filteredUsers.length === 0 && (
                  <tr>
-                    <td colSpan={7} className="p-8 text-center text-gray-400 dark:text-gray-500">Nessun utente trovato</td>
+                    <td colSpan={7} className="p-8 text-center text-gray-400 dark:text-gray-500">Nessun lavoratore trovato</td>
                  </tr>
               )}
             </tbody>
           </table>
           <div className="bg-gray-50 dark:bg-gray-700 p-3 border-t border-gray-200 dark:border-gray-600 text-xs text-gray-500 dark:text-gray-400 flex justify-between items-center">
-             <span>Visualizzati {filteredUsers.length} utenti</span>
+             <span>Visualizzati {filteredUsers.length} lavoratori</span>
              <div className="flex gap-1">
                 <button className="px-2 py-1 border dark:border-gray-600 rounded bg-white dark:bg-gray-800 dark:text-gray-300 disabled:opacity-50" disabled>Precedente</button>
                 <button className="px-2 py-1 border dark:border-gray-600 rounded bg-white dark:bg-gray-800 dark:text-gray-300">1</button>
@@ -861,7 +862,7 @@ const Users: React.FC<UsersProps> = ({ users, setUsers, createUser, updateUser, 
                     {importResult.imported > 0 ? 'Importazione Completata' : 'Importazione Fallita'}
                   </h3>
                   <p className="text-sm text-gray-600 dark:text-gray-300">
-                    {importResult.imported} utenti importati
+                    {importResult.imported} lavoratori importati
                     {importResult.skipped > 0 && `, ${importResult.skipped} righe vuote ignorate`}
                   </p>
                 </div>
@@ -897,7 +898,7 @@ const Users: React.FC<UsersProps> = ({ users, setUsers, createUser, updateUser, 
               {importResult.imported > 0 && importResult.errors.length === 0 && (
                 <div className="p-4 border-t border-gray-200 dark:border-gray-700">
                   <p className="text-green-700 dark:text-green-300 text-sm">
-                    Tutti gli utenti sono stati importati correttamente.
+                    Tutti i lavoratori sono stati importati correttamente.
                   </p>
                 </div>
               )}
@@ -977,6 +978,7 @@ const Users: React.FC<UsersProps> = ({ users, setUsers, createUser, updateUser, 
           setHasUnsavedChanges(hasChanges);
         }}
         saveFormRef={saveFormRef}
+        companies={companies}
       />
 
       {/* Unsaved Changes Dialog */}
@@ -1041,9 +1043,10 @@ interface UserFormProps {
   isSaving?: boolean;
   onFormChange?: (formData: User, hasChanges: boolean) => void;
   saveFormRef?: React.MutableRefObject<(() => Promise<boolean>) | null>;
+  companies: ImpresaEdile[];
 }
 
-const UserForm: React.FC<UserFormProps> = ({ user, onSave, onCancel, isCreating, isSaving = false, onFormChange, saveFormRef }) => {
+const UserForm: React.FC<UserFormProps> = ({ user, onSave, onCancel, isCreating, isSaving = false, onFormChange, saveFormRef, companies }) => {
   // Carica i tipi di certificato dinamici da localStorage
   const { types: certificateTypes, loading: loadingCertTypes } = useCertificateTypes();
   const [formData, setFormData] = useState<User>(user);
@@ -1264,7 +1267,7 @@ const UserForm: React.FC<UserFormProps> = ({ user, onSave, onCancel, isCreating,
         const actualAge = monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate()) ? age - 1 : age;
 
         if (actualAge < 14) {
-          newErrors.birthDate = 'L\'utente deve avere almeno 14 anni';
+          newErrors.birthDate = 'Il lavoratore deve avere almeno 14 anni';
         } else if (actualAge > 120) {
           newErrors.birthDate = 'Età non plausibile (oltre 120 anni)';
         }
@@ -1709,7 +1712,7 @@ const UserForm: React.FC<UserFormProps> = ({ user, onSave, onCancel, isCreating,
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 max-w-4xl mx-auto overflow-hidden">
        <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-700">
-          <h2 className="text-xl font-bold text-gray-800 dark:text-white">{isCreating ? 'Nuovo Utente' : `Modifica ${formData.firstName} ${formData.lastName}`}</h2>
+          <h2 className="text-xl font-bold text-gray-800 dark:text-white">{isCreating ? 'Nuovo Lavoratore' : `Modifica ${formData.firstName} ${formData.lastName}`}</h2>
           <div className="flex gap-2">
              <button onClick={onCancel} className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md text-sm font-medium">Annulla</button>
              <button onClick={handleSave} disabled={isSaving} className="px-4 py-2 bg-primary hover:bg-secondary text-white rounded-md text-sm font-medium flex items-center gap-2 disabled:opacity-60">
@@ -1953,6 +1956,18 @@ const UserForm: React.FC<UserFormProps> = ({ user, onSave, onCancel, isCreating,
                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Provincia</label>
                      <input type="text" value={formData.province} onChange={e => handleInputChange('province', e.target.value.toUpperCase())} maxLength={2} className="w-full p-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none uppercase font-mono" placeholder="AG" />
                   </div>
+                  <div>
+                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Stato</label>
+                     <select
+                       value={formData.status}
+                       onChange={e => handleInputChange('status', e.target.value)}
+                       className="w-full p-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                     >
+                       <option value={UserStatus.ACTIVE}>Attivo</option>
+                       <option value={UserStatus.SUSPENDED}>Sospeso</option>
+                       <option value={UserStatus.LOCKED}>Bloccato</option>
+                     </select>
+                  </div>
                </div>
              )}
           </div>
@@ -2123,6 +2138,67 @@ const UserForm: React.FC<UserFormProps> = ({ user, onSave, onCancel, isCreating,
                   ) : (
                      <p className="text-center text-gray-400 dark:text-gray-500 text-sm py-4">Nessun certificato caricato.</p>
                   )}
+               </div>
+             )}
+
+             {/* Sezione Azienda */}
+             <SectionHeader id="company" title="Azienda" />
+             {activeSection === 'company' && (
+               <div className="p-6 animate-in slide-in-from-top-2 duration-200">
+                 <div className="mb-4">
+                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                     <Building2 size={16} className="inline mr-1 mb-0.5" />
+                     Impresa Edile
+                   </label>
+                   <select
+                     value={formData.companyId || ''}
+                     onChange={(e) => setFormData(prev => ({ ...prev, companyId: e.target.value || undefined }))}
+                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-secondary/50 dark:bg-gray-700 dark:text-white"
+                   >
+                     <option value="">-- Nessuna azienda --</option>
+                     {companies
+                       .filter(c => c.status === 'Attivo')
+                       .sort((a, b) => a.ragioneSociale.localeCompare(b.ragioneSociale, 'it'))
+                       .map(c => (
+                         <option key={c.id} value={c.id}>
+                           {c.ragioneSociale} — P.IVA {c.partitaIva}
+                         </option>
+                       ))
+                     }
+                   </select>
+                 </div>
+
+                 {/* Riepilogo impresa selezionata */}
+                 {formData.companyId && (() => {
+                   const selected = companies.find(c => c.id === formData.companyId);
+                   if (!selected) return null;
+                   return (
+                     <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4 text-sm">
+                       <h4 className="font-semibold text-blue-800 dark:text-blue-300 mb-2 flex items-center gap-2">
+                         <Building2 size={16} />
+                         {selected.ragioneSociale}
+                       </h4>
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-gray-700 dark:text-gray-300">
+                         <div>
+                           <span className="text-xs text-gray-500 dark:text-gray-400">Indirizzo:</span>
+                           <p>{selected.address}{selected.houseNumber ? `, ${selected.houseNumber}` : ''} — {selected.zipCode} {selected.city} ({selected.province})</p>
+                         </div>
+                         {selected.pec && (
+                           <div>
+                             <span className="text-xs text-gray-500 dark:text-gray-400">PEC:</span>
+                             <p>{selected.pec}</p>
+                           </div>
+                         )}
+                         {selected.phone && (
+                           <div>
+                             <span className="text-xs text-gray-500 dark:text-gray-400">Telefono:</span>
+                             <p>{selected.phone}</p>
+                           </div>
+                         )}
+                       </div>
+                     </div>
+                   );
+                 })()}
                </div>
              )}
           </div>

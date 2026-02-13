@@ -6,8 +6,9 @@ import Dashboard from './pages/Dashboard';
 import Users from './pages/Users';
 import Operators from './pages/Operators';
 import Settings from './pages/Settings';
-import { Role, Operator, User } from './types';
-import { useUsers, useOperators, useAuth, useSettings, useInactivityTimeout, useBacheca, useActivities } from './lib/hooks';
+import Companies from './pages/Companies';
+import { Role, Operator, User, ImpresaEdile } from './types';
+import { useUsers, useOperators, useAuth, useSettings, useInactivityTimeout, useBacheca, useActivities, useCompanies } from './lib/hooks';
 
 const App: React.FC = () => {
   // Supabase Hooks
@@ -15,6 +16,7 @@ const App: React.FC = () => {
   const { users, setUsers, loading: usersLoading, createUser, updateUser, deleteUser, deleteUsers } = useUsers();
   const { operators, loading: operatorsLoading, createOperator, updateOperator, deleteOperator } = useOperators();
   const { settings, setSettings } = useSettings(auth.currentOperator?.email || null);
+  const { companies, loading: companiesLoading, createCompany, updateCompany, deleteCompany, deleteCompanies } = useCompanies();
   const bacheca = useBacheca();
   const activities = useActivities();
 
@@ -57,7 +59,7 @@ const App: React.FC = () => {
             const added = addedUsers[0];
             activities.logActivity(
               'user_created',
-              'Nuovo utente creato:',
+              'Nuovo lavoratore creato:',
               currentOperator.id,
               operatorName,
               `${added.firstName} ${added.lastName}`
@@ -66,7 +68,7 @@ const App: React.FC = () => {
             // Importazione multipla
             activities.logActivity(
               'user_imported',
-              `Importati ${addedUsers.length} utenti`,
+              `Importati ${addedUsers.length} lavoratori`,
               currentOperator.id,
               operatorName
             );
@@ -79,7 +81,7 @@ const App: React.FC = () => {
             const deleted = deletedUsers[0];
             activities.logActivity(
               'user_deleted',
-              'Utente eliminato:',
+              'Lavoratore eliminato:',
               currentOperator.id,
               operatorName,
               `${deleted.firstName} ${deleted.lastName}`
@@ -87,7 +89,7 @@ const App: React.FC = () => {
           } else if (deletedUsers.length > 1) {
             activities.logActivity(
               'user_deleted',
-              `Eliminati ${deletedUsers.length} utenti`,
+              `Eliminati ${deletedUsers.length} lavoratori`,
               currentOperator.id,
               operatorName
             );
@@ -128,7 +130,7 @@ const App: React.FC = () => {
               } else {
                 activities.logActivity(
                   'user_updated',
-                  'Utente modificato:',
+                  'Lavoratore modificato:',
                   currentOperator.id,
                   operatorName,
                   `${modifiedUser.firstName} ${modifiedUser.lastName}`
@@ -155,7 +157,7 @@ const App: React.FC = () => {
     if (auth.currentOperator) {
       await activities.logActivity(
         'user_created',
-        'Nuovo utente creato:',
+        'Nuovo lavoratore creato:',
         auth.currentOperator.id,
         `${auth.currentOperator.firstName} ${auth.currentOperator.lastName}`,
         `${newUser.firstName} ${newUser.lastName}`
@@ -195,7 +197,7 @@ const App: React.FC = () => {
       } else {
         await activities.logActivity(
           'user_updated',
-          'Utente modificato:',
+          'Lavoratore modificato:',
           auth.currentOperator.id,
           `${auth.currentOperator.firstName} ${auth.currentOperator.lastName}`,
           `${updatedUser.firstName} ${updatedUser.lastName}`
@@ -212,7 +214,7 @@ const App: React.FC = () => {
     if (auth.currentOperator && userToDelete) {
       await activities.logActivity(
         'user_deleted',
-        'Utente eliminato:',
+        'Lavoratore eliminato:',
         auth.currentOperator.id,
         `${auth.currentOperator.firstName} ${auth.currentOperator.lastName}`,
         `${userToDelete.firstName} ${userToDelete.lastName}`
@@ -227,7 +229,7 @@ const App: React.FC = () => {
     if (auth.currentOperator) {
       await activities.logActivity(
         'user_deleted',
-        `Eliminati ${usersToDelete.length} utenti`,
+        `Eliminati ${usersToDelete.length} lavoratori`,
         auth.currentOperator.id,
         `${auth.currentOperator.firstName} ${auth.currentOperator.lastName}`
       );
@@ -249,6 +251,90 @@ const App: React.FC = () => {
     return newOperator;
   };
 
+  // Wrapper per createCompany che logga l'attività
+  const createCompanyWithLogging = async (company: Omit<ImpresaEdile, 'id'>) => {
+    const newCompany = await createCompany(company);
+    if (auth.currentOperator) {
+      await activities.logActivity(
+        'company_created',
+        'Nuova impresa creata:',
+        auth.currentOperator.id,
+        `${auth.currentOperator.firstName} ${auth.currentOperator.lastName}`,
+        newCompany.ragioneSociale
+      );
+    }
+    return newCompany;
+  };
+
+  // Wrapper per updateCompany che logga l'attività
+  const updateCompanyWithLogging = async (id: string, company: Partial<ImpresaEdile>) => {
+    const existing = companies.find(c => c.id === id);
+    const updatedCompany = await updateCompany(id, company);
+    if (auth.currentOperator && existing) {
+      const oldDocs = existing.documents || [];
+      const newDocs = updatedCompany.documents || [];
+
+      if (newDocs.length > oldDocs.length) {
+        const addedDoc = newDocs.find(nd => !oldDocs.some(od => od.id === nd.id));
+        if (addedDoc) {
+          await activities.logActivity(
+            'document_added',
+            `Documento "${addedDoc.name}" aggiunto a`,
+            auth.currentOperator.id,
+            `${auth.currentOperator.firstName} ${auth.currentOperator.lastName}`,
+            updatedCompany.ragioneSociale
+          );
+        }
+      } else if (newDocs.length < oldDocs.length) {
+        await activities.logActivity(
+          'document_deleted',
+          'Documento rimosso da',
+          auth.currentOperator.id,
+          `${auth.currentOperator.firstName} ${auth.currentOperator.lastName}`,
+          updatedCompany.ragioneSociale
+        );
+      } else {
+        await activities.logActivity(
+          'company_updated',
+          'Impresa modificata:',
+          auth.currentOperator.id,
+          `${auth.currentOperator.firstName} ${auth.currentOperator.lastName}`,
+          updatedCompany.ragioneSociale
+        );
+      }
+    }
+    return updatedCompany;
+  };
+
+  // Wrapper per deleteCompany che logga l'attività
+  const deleteCompanyWithLogging = async (id: string) => {
+    const companyToDelete = companies.find(c => c.id === id);
+    await deleteCompany(id);
+    if (auth.currentOperator && companyToDelete) {
+      await activities.logActivity(
+        'company_deleted',
+        'Impresa eliminata:',
+        auth.currentOperator.id,
+        `${auth.currentOperator.firstName} ${auth.currentOperator.lastName}`,
+        companyToDelete.ragioneSociale
+      );
+    }
+  };
+
+  // Wrapper per deleteCompanies (multipli) che logga l'attività
+  const deleteCompaniesWithLogging = async (ids: string[]) => {
+    const companiesToDelete = companies.filter(c => ids.includes(c.id));
+    await deleteCompanies(ids);
+    if (auth.currentOperator) {
+      await activities.logActivity(
+        'company_deleted',
+        `Eliminate ${companiesToDelete.length} imprese`,
+        auth.currentOperator.id,
+        `${auth.currentOperator.firstName} ${auth.currentOperator.lastName}`
+      );
+    }
+  };
+
   // Logout automatico per inattività (2 minuti)
   useInactivityTimeout(handleLogout, auth.isAuthenticated);
 
@@ -258,7 +344,7 @@ const App: React.FC = () => {
   }
 
   // Mostra loading durante il caricamento iniziale
-  if (usersLoading || operatorsLoading) {
+  if (usersLoading || operatorsLoading || companiesLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-dark to-primary">
         <div className="text-white text-xl animate-pulse">Caricamento dati...</div>
@@ -276,7 +362,8 @@ const App: React.FC = () => {
         <Layout userRole={userRole} onLogout={handleLogout} userName={userName}>
           <Routes>
             <Route path="/" element={<Dashboard user={{ name: userName }} settings={settings} users={users} bacheca={bacheca} activities={activities} currentOperator={currentOperator} />} />
-            <Route path="/users" element={<Users users={users} setUsers={setUsersWithLogging} createUser={createUserWithLogging} updateUser={updateUserWithLogging} deleteUser={deleteUserWithLogging} deleteUsers={deleteUsersWithLogging} currentUserRole={userRole} />} />
+            <Route path="/users" element={<Users users={users} setUsers={setUsersWithLogging} createUser={createUserWithLogging} updateUser={updateUserWithLogging} deleteUser={deleteUserWithLogging} deleteUsers={deleteUsersWithLogging} currentUserRole={userRole} companies={companies} />} />
+            <Route path="/companies" element={<Companies companies={companies} createCompany={createCompanyWithLogging} updateCompany={updateCompanyWithLogging} deleteCompany={deleteCompanyWithLogging} deleteCompanies={deleteCompaniesWithLogging} currentUserRole={userRole} users={users} updateUser={updateUserWithLogging} />} />
             <Route
               path="/operators"
               element={userRole === Role.ADMIN ? <Operators operators={operators} createOperator={createOperatorWithLogging} updateOperator={updateOperator} deleteOperator={deleteOperator} /> : <Navigate to="/" />}

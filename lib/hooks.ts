@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { User, Operator, AppSettings } from '../types';
+import { User, Operator, AppSettings, ImpresaEdile } from '../types';
 import { STORAGE_MODE } from './config';
-import { usersService, operatorsService, settingsService, bachecaService, NotaBacheca } from './services';
+import { usersService, operatorsService, settingsService, bachecaService, companiesService, NotaBacheca } from './services';
 import { supabase } from './supabase';
 import {
   localUsersService,
@@ -10,6 +10,7 @@ import {
   localBachecaService,
   localActivitiesService,
   localCertificateTypesService,
+  localCompaniesService,
   Activity,
   ActivityType,
   CertificateType
@@ -22,6 +23,7 @@ const usersApi = STORAGE_MODE === 'local' ? localUsersService : usersService;
 const operatorsApi = STORAGE_MODE === 'local' ? localOperatorsService : operatorsService; // hybrid usa Supabase
 const settingsApi = STORAGE_MODE === 'local' ? localSettingsService : settingsService; // hybrid usa Supabase
 const bachecaApi = STORAGE_MODE === 'local' ? localBachecaService : bachecaService; // hybrid usa Supabase
+const companiesApi = STORAGE_MODE === 'local' ? localCompaniesService : companiesService;
 const activitiesApi = localActivitiesService; // Sempre locale per semplicità
 
 // ============ USERS HOOK ============
@@ -101,6 +103,85 @@ export function useUsers() {
     updateUser,
     deleteUser,
     deleteUsers
+  };
+}
+
+// ============ COMPANIES HOOK ============
+
+export function useCompanies() {
+  const [companies, setCompanies] = useState<ImpresaEdile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchCompanies = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await companiesApi.getAll();
+      setCompanies(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Errore nel caricamento imprese');
+      console.error('Error fetching companies:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchCompanies();
+  }, [fetchCompanies]);
+
+  const createCompany = async (company: Omit<ImpresaEdile, 'id'>) => {
+    try {
+      const newCompany = await companiesApi.create(company);
+      setCompanies(prev => [...prev, newCompany]);
+      return newCompany;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Errore nella creazione impresa');
+      throw err;
+    }
+  };
+
+  const updateCompany = async (id: string, company: Partial<ImpresaEdile>) => {
+    try {
+      const updatedCompany = await companiesApi.update(id, company);
+      setCompanies(prev => prev.map(c => c.id === id ? updatedCompany : c));
+      return updatedCompany;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Errore nell'aggiornamento impresa");
+      throw err;
+    }
+  };
+
+  const deleteCompany = async (id: string) => {
+    try {
+      await companiesApi.delete(id);
+      setCompanies(prev => prev.filter(c => c.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Errore nell'eliminazione impresa");
+      throw err;
+    }
+  };
+
+  const deleteCompanies = async (ids: string[]) => {
+    try {
+      await companiesApi.deleteMany(ids);
+      setCompanies(prev => prev.filter(c => !ids.includes(c.id)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Errore nell'eliminazione imprese");
+      throw err;
+    }
+  };
+
+  return {
+    companies,
+    loading,
+    error,
+    refresh: fetchCompanies,
+    createCompany,
+    updateCompany,
+    deleteCompany,
+    deleteCompanies
   };
 }
 

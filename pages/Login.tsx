@@ -155,7 +155,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, loading: externalLoading, error:
         </div>
         
         <div className="mt-8 text-center text-white/40 text-xs">
-          Prodotto e gestito da PC8 srl - Build 1 beta 2
+          Prodotto e gestito da PC8 srl - Build 1 beta 5
         </div>
       </div>
     </div>

@@ -9,7 +9,7 @@
 1. [Introduzione](#introduzione)
 2. [Accesso al Sistema](#accesso-al-sistema)
 3. [Dashboard](#dashboard)
-4. [Gestione Utenti (Lavoratori)](#gestione-utenti-lavoratori)
+4. [Gestione Lavoratori](#gestione-utenti-lavoratori)
 5. [Gestione Operatori](#gestione-operatori)
 6. [Impostazioni](#impostazioni)
 7. [Suggerimenti e Best Practice](#suggerimenti-e-best-practice)
@@ -29,8 +29,8 @@ Il sistema prevede due tipi di utenti operatori:
 
 | Ruolo | Cosa può fare |
 |-------|---------------|
-| **Amministratore** | Accesso completo: Dashboard, Utenti, Operatori, tutte le Impostazioni (SMTP, Notifiche, Backup) |
-| **Segreteria** | Accesso limitato: Dashboard, Utenti, Impostazioni ridotte (solo personalizzazione widget) |
+| **Amministratore** | Accesso completo: Dashboard, Lavoratori, Operatori, tutte le Impostazioni (SMTP, Notifiche, Backup) |
+| **Segreteria** | Accesso limitato: Dashboard, Lavoratori, Impostazioni ridotte (solo personalizzazione widget) |
 
 ### Requisiti
 
@@ -95,14 +95,14 @@ Questo è il widget più importante per monitorare lo stato dei certificati:
 | 🟡 **Giallo** | Certificati in scadenza entro 30 giorni |
 | ⚫ **Grigio** | Certificati già scaduti |
 
-**Suggerimento:** Ogni card colorata è cliccabile! Cliccando si viene reindirizzati alla lista utenti filtrata per quella specifica scadenza.
+**Suggerimento:** Ogni card colorata è cliccabile! Cliccando si viene reindirizzati alla lista lavoratori filtrata per quella specifica scadenza.
 
 ### Attività recenti
 
 Questa sezione mostra un log temporale di tutte le operazioni effettuate nel sistema:
-- Creazione di nuovi utenti
-- Modifica di utenti esistenti
-- Eliminazione di utenti
+- Creazione di nuovi lavoratori
+- Modifica di lavoratori esistenti
+- Eliminazione di lavoratori
 - Aggiunta/rimozione di certificati
 - Accessi al sistema
 
@@ -119,11 +119,11 @@ La bacheca permette agli operatori di lasciare note visibili a tutti i colleghi.
 
 ---
 
-## Gestione Utenti (Lavoratori)
+## Gestione Lavoratori
 
-Questa sezione permette di gestire l'anagrafica dei lavoratori e i loro certificati. Accessibile dal menu **Utenti** o navigando a `/users`.
+Questa sezione permette di gestire l'anagrafica dei lavoratori e i loro certificati. Accessibile dal menu **Lavoratori** o navigando a `/users`.
 
-### Visualizzare la lista utenti
+### Visualizzare la lista lavoratori
 
 La pagina mostra l'elenco di tutti i lavoratori registrati nel sistema.
 
@@ -133,14 +133,14 @@ La pagina mostra l'elenco di tutti i lavoratori registrati nel sistema.
 
 **Filtri disponibili:**
 - **Stato:** Attivo, Sospeso, Bloccato
-- **Scadenze certificati:** per visualizzare solo utenti con certificati in determinate condizioni
+- **Scadenze certificati:** per visualizzare solo lavoratori con certificati in determinate condizioni
 
 **Ordinamento:**
 - Cliccare sull'intestazione di una colonna per ordinare i dati
 
-### Creare un nuovo utente
+### Creare un nuovo lavoratore
 
-1. Dalla pagina Utenti, cliccare su **Nuovo Utente**
+1. Dalla pagina Lavoratori, cliccare su **Nuovo Lavoratore**
 2. Compilare il modulo seguendo questi passaggi:
 
 #### Passo 1: Codice Fiscale
@@ -189,17 +189,17 @@ Inserire il Codice Fiscale del lavoratore. Il sistema:
 
 3. Cliccare su **Salva** per confermare
 
-### Modificare un utente esistente
+### Modificare un lavoratore esistente
 
-1. Dalla lista utenti, cliccare sul nome dell'utente o sull'icona di modifica (matita)
+1. Dalla lista lavoratori, cliccare sul nome del lavoratore o sull'icona di modifica (matita)
 2. Modificare i campi desiderati
 3. Cliccare su **Salva** per confermare le modifiche
 
-### Gestire i certificati di un utente
+### Gestire i certificati di un lavoratore
 
 #### Visualizzare i certificati
 
-1. Aprire il profilo dell'utente
+1. Aprire il profilo del lavoratore
 2. Scorrere fino alla sezione **Certificati**
 
 I certificati sono visualizzati con colori che indicano lo stato:
@@ -210,7 +210,7 @@ I certificati sono visualizzati con colori che indicano lo stato:
 
 #### Aggiungere un certificato
 
-1. Nel profilo utente, sezione Certificati, cliccare su **Aggiungi Certificato**
+1. Nel profilo lavoratore, sezione Certificati, cliccare su **Aggiungi Certificato**
 2. Compilare i campi:
    - **Tipo certificato:** selezionare dal menu a tendina
    - **Data emissione:** data di rilascio del certificato
@@ -226,51 +226,51 @@ Cliccare sull'icona di download accanto al certificato desiderato.
 
 Cliccare sull'icona del cestino accanto al certificato e confermare l'eliminazione.
 
-### Importare utenti da file CSV
+### Importare lavoratori da file CSV
 
-Questa funzione permette di caricare molti utenti contemporaneamente.
+Questa funzione permette di caricare molti lavoratori contemporaneamente.
 
 1. **Scaricare il template:** Andare in Impostazioni e scaricare il file template CSV
 2. **Compilare il file:** Aprire con Excel e compilare i dati
    - **Importante:** il separatore deve essere il punto e virgola (;)
 3. **Importare il file:**
-   - Dalla pagina Utenti, cliccare su **Importa CSV**
+   - Dalla pagina Lavoratori, cliccare su **Importa CSV**
    - Selezionare il file compilato
    - Controllare l'anteprima dei dati
    - Cliccare su **Conferma importazione**
-4. **Verificare il risultato:** Il sistema mostra un report con numero di utenti importati ed eventuali errori
+4. **Verificare il risultato:** Il sistema mostra un report con numero di lavoratori importati ed eventuali errori
 
 ### Esportare dati
 
-#### Export singolo utente in PDF
+#### Export singolo lavoratore in PDF
 
-1. Aprire il profilo dell'utente
+1. Aprire il profilo del lavoratore
 2. Cliccare su **Esporta PDF**
 3. Viene generato un PDF con tutti i dati e un QR code identificativo
 
 #### Export lista in CSV
 
-1. Dalla pagina Utenti, cliccare su **Esporta CSV**
-2. Viene scaricato un file con tutti gli utenti e i relativi dati
+1. Dalla pagina Lavoratori, cliccare su **Esporta CSV**
+2. Viene scaricato un file con tutti i lavoratori e i relativi dati
 
-### Bloccare/Sbloccare un utente
+### Bloccare/Sbloccare un lavoratore
 
-1. Dalla lista utenti, selezionare l'utente
+1. Dalla lista lavoratori, selezionare il lavoratore
 2. Cliccare sull'icona del lucchetto per bloccare/sbloccare
-3. Gli utenti bloccati non possono essere modificati fino allo sblocco
+3. I lavoratori bloccati non possono essere modificati fino allo sblocco
 
-### Eliminare utenti
+### Eliminare lavoratori
 
 #### Eliminazione singola
 
-1. Dalla lista utenti, cliccare sull'icona del cestino accanto all'utente
+1. Dalla lista lavoratori, cliccare sull'icona del cestino accanto al lavoratore
 2. Confermare l'eliminazione
 
 **Attenzione:** L'eliminazione è permanente e rimuove anche tutti i certificati associati.
 
 #### Eliminazione multipla
 
-1. Selezionare più utenti tramite le checkbox
+1. Selezionare più lavoratori tramite le checkbox
 2. Cliccare su **Elimina selezionati**
 3. Confermare l'operazione
 
@@ -362,7 +362,7 @@ Regolare la dimensione del testo per una migliore leggibilità.
 4. Il file ZIP viene scaricato automaticamente
 
 **Cosa contiene il backup:**
-- Tutti i dati degli utenti (JSON)
+- Tutti i dati dei lavoratori (JSON)
 - Tutti i certificati allegati (file originali)
 - Dati degli operatori
 - Impostazioni del sistema
@@ -375,7 +375,7 @@ Regolare la dimensione del testo per una migliore leggibilità.
 1. Andare in **Impostazioni → Backup**
 2. Cliccare su **Ripristina Backup**
 3. Selezionare il file ZIP di backup
-4. Verificare l'anteprima (numero utenti, certificati, data backup)
+4. Verificare l'anteprima (numero lavoratori, certificati, data backup)
 5. Cliccare su **Conferma Ripristino**
 6. Attendere il completamento (il sistema si ricarica automaticamente)
 
@@ -462,7 +462,7 @@ Scegliere tra:
 ##### Destinatari
 
 - **Notifica operatori:** invia email agli operatori del sistema
-- **Notifica utenti:** invia email ai lavoratori (se hanno email registrata)
+- **Notifica lavoratori:** invia email ai lavoratori (se hanno email registrata)
 
 ##### Personalizzare i template
 
@@ -537,7 +537,7 @@ R: Sì, ma è consigliabile utilizzare un solo dispositivo per evitare conflitti
 
 ---
 
-### Utenti e Certificati
+### Lavoratori e Certificati
 
 **D: Ho inserito un Codice Fiscale ma i campi non si compilano automaticamente.**
 
@@ -547,13 +547,13 @@ R: Verificare che il Codice Fiscale sia digitato correttamente e sia un CF itali
 
 R: Controllare che il file sia in formato PDF, PNG o JPG e che non superi le dimensioni massime consentite (generalmente 10 MB).
 
-**D: Ho eliminato un utente per errore, posso recuperarlo?**
+**D: Ho eliminato un lavoratore per errore, posso recuperarlo?**
 
 R: L'eliminazione è permanente. L'unico modo per recuperare i dati è ripristinare un backup precedente (se disponibile).
 
-**D: Cosa significa lo stato "Sospeso" per un utente?**
+**D: Cosa significa lo stato "Sospeso" per un lavoratore?**
 
-R: Un utente sospeso rimane nel sistema ma è temporaneamente disattivato. Può essere riattivato in qualsiasi momento. Utile per lavoratori in aspettativa o trasferimento temporaneo.
+R: Un lavoratore sospeso rimane nel sistema ma è temporaneamente disattivato. Può essere riattivato in qualsiasi momento. Utile per lavoratori in aspettativa o trasferimento temporaneo.
 
 **D: Posso modificare un certificato già inserito?**
 
@@ -577,7 +577,7 @@ R: Aprire Excel, selezionare "Apri" → scegliere il file CSV → nella procedur
 
 **D: Il PDF esportato non mostra tutti i dati.**
 
-R: Verificare che l'utente abbia tutti i campi compilati. I campi vuoti non vengono visualizzati nel PDF.
+R: Verificare che il lavoratore abbia tutti i campi compilati. I campi vuoti non vengono visualizzati nel PDF.
 
 ---
 
@@ -588,12 +588,12 @@ R: Verificare che l'utente abbia tutti i campi compilati. I campi vuoti non veng
 R: Verificare:
 - Che il test email funzioni (pulsante "Test Email")
 - Che le notifiche siano abilitate
-- Che gli utenti abbiano un indirizzo email valido
+- Che i lavoratori abbiano un indirizzo email valido
 - Che le email non finiscano nella cartella spam
 
-**D: Posso inviare notifiche solo a certi utenti?**
+**D: Posso inviare notifiche solo a certi lavoratori?**
 
-R: Al momento le notifiche vengono inviate a tutti gli utenti con email valida. È possibile però disabilitare temporaneamente l'email di un utente rimuovendola dal suo profilo.
+R: Al momento le notifiche vengono inviate a tutti i lavoratori con email valida. È possibile però disabilitare temporaneamente l'email di un lavoratore rimuovendola dal suo profilo.
 
 **D: Come faccio a sapere se una notifica è stata inviata?**
 
@@ -605,7 +605,7 @@ R: Il log delle attività nella Dashboard registra anche l'invio delle notifiche
 
 **D: Quanto spazio occupa un backup?**
 
-R: Dipende dal numero di utenti e soprattutto dai file dei certificati allegati. Un backup tipico può variare da pochi MB a diversi GB.
+R: Dipende dal numero di lavoratori e soprattutto dai file dei certificati allegati. Un backup tipico può variare da pochi MB a diversi GB.
 
 **D: Posso ripristinare solo alcuni dati dal backup?**
 

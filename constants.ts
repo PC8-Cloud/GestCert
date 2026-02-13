@@ -1,4 +1,4 @@
-import { Role, User, UserStatus, Operator } from './types';
+import { Role, User, UserStatus, Operator, ImpresaEdile } from './types';
 
 // Genera date relative a oggi per i test
 const today = new Date();
@@ -103,6 +103,78 @@ export const MOCK_USERS: User[] = [
         expiryDate: addDays(-10), // Scaduto 10 giorni fa
       }
     ]
+  }
+];
+
+export const MOCK_COMPANIES: ImpresaEdile[] = [
+  {
+    id: 'comp1',
+    partitaIva: '00488410010',
+    ragioneSociale: 'TIM S.P.A.',
+    formaGiuridica: 'SPA',
+    codiceFiscale: '00488410010',
+    pec: 'tim@pec.telecomitalia.it',
+    email: 'info@tim.it',
+    phone: '0636881',
+    address: 'Via Gaetano Negri',
+    houseNumber: '1',
+    zipCode: '20123',
+    city: 'Milano',
+    province: 'MI',
+    codiceAteco: '61.10.00',
+    status: UserStatus.ACTIVE,
+    documents: [
+      {
+        id: 'doc1',
+        name: 'DURC',
+        issueDate: '2024-06-01',
+        expiryDate: addDays(45),
+      },
+      {
+        id: 'doc2',
+        name: 'Visura Camerale',
+        issueDate: '2024-09-15',
+        expiryDate: addDays(90),
+      }
+    ]
+  },
+  {
+    id: 'comp2',
+    partitaIva: '01234567890',
+    ragioneSociale: 'Edil Costruzioni SRL',
+    formaGiuridica: 'SRL',
+    pec: 'edilcostruzioni@pec.it',
+    address: 'Via Roma',
+    houseNumber: '42',
+    zipCode: '92100',
+    city: 'Agrigento',
+    province: 'AG',
+    codiceAteco: '41.20.00',
+    status: UserStatus.ACTIVE,
+    documents: [
+      {
+        id: 'doc3',
+        name: 'DURC',
+        issueDate: '2024-01-10',
+        expiryDate: addDays(-15),
+      }
+    ]
+  },
+  {
+    id: 'comp3',
+    partitaIva: '09876543210',
+    ragioneSociale: 'Impresa Edile Rossi SNC',
+    formaGiuridica: 'SNC',
+    pec: 'rossi@pec.it',
+    email: 'info@rossi-edile.it',
+    mobile: '3339876543',
+    address: 'Corso Italia',
+    houseNumber: '100',
+    zipCode: '92019',
+    city: 'Sciacca',
+    province: 'AG',
+    status: UserStatus.SUSPENDED,
+    documents: []
   }
 ];
 

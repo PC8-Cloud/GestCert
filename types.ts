@@ -38,6 +38,7 @@ export interface User {
   group?: string;
   notes?: string;
   status: UserStatus;
+  companyId?: string; // ID dell'impresa edile associata
   certificates: Certificate[];
   createdAt?: string; // Data di inserimento
 }
@@ -52,6 +53,37 @@ export interface Operator {
   lastAccess?: string;
   passwordHash?: string;
   authUserId?: string;
+}
+
+export interface CompanyDocument {
+  id: string;
+  name: string;
+  issueDate: string;
+  expiryDate: string;
+  fileUrl?: string;
+}
+
+export interface ImpresaEdile {
+  id: string;
+  partitaIva: string;
+  ragioneSociale: string;
+  formaGiuridica?: string;
+  codiceFiscale?: string;
+  codiceREA?: string;
+  pec?: string;
+  email?: string;
+  phone?: string;
+  mobile?: string;
+  address: string;
+  houseNumber?: string;
+  zipCode: string;
+  city: string;
+  province: string;
+  codiceAteco?: string;
+  notes?: string;
+  status: UserStatus;
+  documents: CompanyDocument[];
+  createdAt?: string;
 }
 
 export interface AppSettings {

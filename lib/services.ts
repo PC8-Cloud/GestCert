@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { User, Certificate, Operator, UserStatus, Role, AppSettings } from '../types';
+import { User, Certificate, Operator, UserStatus, Role, AppSettings, ImpresaEdile, CompanyDocument } from '../types';
 import { hashPassword } from './password';
 import { STORAGE_BUCKET } from './config';
 import { base64ToDataUrl, deleteStorageUrl, isDataUrl, looksLikeBase64, storageUrlFor, uploadDataUrlToStorage } from './storage';
@@ -115,7 +115,7 @@ export const usersService = {
     if (!skipEmailCheck && user.email && user.email.trim() !== '') {
       const emailExists = await this.checkEmailExists(user.email);
       if (emailExists) {
-        throw new Error(`L'email "${user.email}" è già utilizzata da un altro utente`);
+        throw new Error(`L'email "${user.email}" è già utilizzata da un altro lavoratore`);
       }
     }
 
@@ -123,7 +123,7 @@ export const usersService = {
     if (user.fiscalCode && user.fiscalCode.trim() !== '' && user.fiscalCode !== '0') {
       const cfExists = await this.checkFiscalCodeExists(user.fiscalCode);
       if (cfExists) {
-        throw new Error(`Il codice fiscale "${user.fiscalCode}" è già utilizzato da un altro utente`);
+        throw new Error(`Il codice fiscale "${user.fiscalCode}" è già utilizzato da un altro lavoratore`);
       }
     }
 
@@ -278,7 +278,7 @@ export const usersService = {
     if (user.email !== undefined && user.email && user.email.trim() !== '') {
       const emailExists = await this.checkEmailExists(user.email, id);
       if (emailExists) {
-        throw new Error(`L'email "${user.email}" è già utilizzata da un altro utente`);
+        throw new Error(`L'email "${user.email}" è già utilizzata da un altro lavoratore`);
       }
     }
 
@@ -286,7 +286,7 @@ export const usersService = {
     if (user.fiscalCode !== undefined && user.fiscalCode && user.fiscalCode.trim() !== '') {
       const cfExists = await this.checkFiscalCodeExists(user.fiscalCode, id);
       if (cfExists) {
-        throw new Error(`Il codice fiscale "${user.fiscalCode}" è già utilizzato da un altro utente`);
+        throw new Error(`Il codice fiscale "${user.fiscalCode}" è già utilizzato da un altro lavoratore`);
       }
     }
 
@@ -954,6 +954,224 @@ function mapDbNotaToNota(dbNota: Record<string, unknown>): NotaBacheca {
   };
 }
 
+// ============ COMPANIES SERVICE ============
+
+export const companiesService = {
+  async getAll(): Promise<ImpresaEdile[]> {
+    const { data: companies, error } = await supabase
+      .from('companies')
+      .select('*')
+      .order('ragione_sociale', { ascending: true });
+
+    if (error) throw error;
+
+    let docs: Record<string, unknown>[] = [];
+    try {
+      const { data: docData, error: docError } = await supabase
+        .from('company_documents')
+        .select('*');
+      if (docError) {
+        console.warn('Impossibile caricare documenti aziendali:', docError.message);
+      } else {
+        docs = docData || [];
+      }
+    } catch (err) {
+      console.warn('Errore caricamento documenti aziendali:', err);
+    }
+
+    const docsByCompany = new Map<string, Record<string, unknown>[]>();
+    for (const doc of docs) {
+      const companyId = doc.company_id as string;
+      if (!companyId) continue;
+      const list = docsByCompany.get(companyId) || [];
+      list.push(doc);
+      docsByCompany.set(companyId, list);
+    }
+
+    return (companies || []).map(c =>
+      mapDbCompanyToCompany({ ...c, documents: docsByCompany.get(c.id as string) || [] })
+    );
+  },
+
+  async getById(id: string): Promise<ImpresaEdile | null> {
+    const { data, error } = await supabase
+      .from('companies')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) throw error;
+    if (!data) return null;
+
+    let docs: Record<string, unknown>[] = [];
+    try {
+      const { data: docData, error: docError } = await supabase
+        .from('company_documents')
+        .select('*')
+        .eq('company_id', id);
+      if (docError) {
+        console.warn('Impossibile caricare documenti impresa:', docError.message);
+      } else {
+        docs = docData || [];
+      }
+    } catch (err) {
+      console.warn('Errore caricamento documenti impresa:', err);
+    }
+
+    return mapDbCompanyToCompany({ ...data, documents: docs });
+  },
+
+  async checkPartitaIvaExists(piva: string, excludeId?: string): Promise<boolean> {
+    if (!piva || piva.trim() === '') return false;
+
+    let query = supabase
+      .from('companies')
+      .select('id')
+      .eq('partita_iva', piva.replace(/[\s.\-]/g, ''));
+
+    if (excludeId) {
+      query = query.neq('id', excludeId);
+    }
+
+    const { data } = await query.maybeSingle();
+    return !!data;
+  },
+
+  async create(company: Omit<ImpresaEdile, 'id'>): Promise<ImpresaEdile> {
+    // Verifica P.IVA duplicata
+    if (company.partitaIva) {
+      const exists = await this.checkPartitaIvaExists(company.partitaIva);
+      if (exists) {
+        throw new Error(`La Partita IVA "${company.partitaIva}" è già registrata`);
+      }
+    }
+
+    const dbCompany = mapCompanyToDbCompany(company as ImpresaEdile);
+    const { data, error } = await supabase
+      .from('companies')
+      .insert(dbCompany)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    // Inserisci documenti
+    if (company.documents && company.documents.length > 0) {
+      for (const doc of company.documents) {
+        await supabase
+          .from('company_documents')
+          .insert({
+            company_id: data.id,
+            name: doc.name,
+            issue_date: doc.issueDate || null,
+            expiry_date: doc.expiryDate,
+            file_url: doc.fileUrl || null,
+          });
+      }
+    }
+
+    // Recupera documenti salvati
+    const { data: savedDocs } = await supabase
+      .from('company_documents')
+      .select('*')
+      .eq('company_id', data.id);
+
+    return mapDbCompanyToCompany({ ...data, documents: savedDocs || [] });
+  },
+
+  async update(id: string, company: Partial<ImpresaEdile>): Promise<ImpresaEdile> {
+    // Verifica P.IVA duplicata
+    if (company.partitaIva) {
+      const exists = await this.checkPartitaIvaExists(company.partitaIva, id);
+      if (exists) {
+        throw new Error(`La Partita IVA "${company.partitaIva}" è già registrata`);
+      }
+    }
+
+    const dbCompany = mapCompanyToDbCompany(company as ImpresaEdile);
+    const { data, error } = await supabase
+      .from('companies')
+      .update({ ...dbCompany, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    // Gestisci documenti se forniti
+    if (company.documents !== undefined) {
+      const { data: existingDocs } = await supabase
+        .from('company_documents')
+        .select('*')
+        .eq('company_id', id);
+
+      const existingList = existingDocs || [];
+      const existingIds = new Set(existingList.map(d => d.id as string));
+      const newDocIds = new Set(company.documents.filter(d => d.id).map(d => d.id));
+
+      // Elimina documenti rimossi
+      const toDelete = existingList.filter(d => !newDocIds.has(d.id as string));
+      for (const doc of toDelete) {
+        await supabase.from('company_documents').delete().eq('id', doc.id);
+      }
+
+      // Aggiorna documenti esistenti
+      const toUpdate = company.documents.filter(d => existingIds.has(d.id));
+      for (const doc of toUpdate) {
+        await supabase
+          .from('company_documents')
+          .update({
+            name: doc.name,
+            issue_date: doc.issueDate || null,
+            expiry_date: doc.expiryDate,
+            file_url: doc.fileUrl || null,
+          })
+          .eq('id', doc.id);
+      }
+
+      // Aggiungi nuovi documenti
+      const toAdd = company.documents.filter(d => !existingIds.has(d.id));
+      for (const doc of toAdd) {
+        await supabase
+          .from('company_documents')
+          .insert({
+            company_id: id,
+            name: doc.name,
+            issue_date: doc.issueDate || null,
+            expiry_date: doc.expiryDate,
+            file_url: doc.fileUrl || null,
+          });
+      }
+    }
+
+    // Recupera documenti aggiornati
+    const { data: docs } = await supabase
+      .from('company_documents')
+      .select('*')
+      .eq('company_id', id);
+
+    return mapDbCompanyToCompany({ ...data, documents: docs || [] });
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('companies')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+  },
+
+  async deleteMany(ids: string[]): Promise<void> {
+    const { error } = await supabase
+      .from('companies')
+      .delete()
+      .in('id', ids);
+
+    if (error) throw error;
+  }
+};
+
 // ============ MAPPERS ============
 
 function mapDbUserToUser(dbUser: Record<string, unknown>): User {
@@ -977,6 +1195,7 @@ function mapDbUserToUser(dbUser: Record<string, unknown>): User {
     province: dbUser.province as string,
     group: dbUser.user_group as string | undefined,
     notes: dbUser.notes as string | undefined,
+    companyId: (dbUser.company_id as string) || undefined,
     status: dbUser.status as UserStatus,
     certificates: ((dbUser.certificates as Record<string, unknown>[]) || []).map(mapDbCertToCert),
     createdAt: dbUser.created_at as string | undefined
@@ -1003,6 +1222,7 @@ function mapUserToDbUser(user: User): Record<string, unknown> {
     province: user.province,
     user_group: user.group,
     notes: user.notes,
+    company_id: user.companyId || null,
     status: user.status
   };
 }
@@ -1028,6 +1248,63 @@ function mapDbOperatorToOperator(dbOp: Record<string, unknown>): Operator {
     lastAccess: dbOp.last_access as string | undefined,
     passwordHash: dbOp.password_hash as string | undefined,
     authUserId: dbOp.auth_user_id as string | undefined
+  };
+}
+
+function mapDbCompanyToCompany(dbCompany: Record<string, unknown>): ImpresaEdile {
+  return {
+    id: dbCompany.id as string,
+    partitaIva: (dbCompany.partita_iva as string) || '',
+    ragioneSociale: (dbCompany.ragione_sociale as string) || '',
+    formaGiuridica: dbCompany.forma_giuridica as string | undefined,
+    codiceFiscale: dbCompany.codice_fiscale as string | undefined,
+    codiceREA: dbCompany.codice_rea as string | undefined,
+    pec: dbCompany.pec as string | undefined,
+    email: dbCompany.email as string | undefined,
+    phone: dbCompany.phone as string | undefined,
+    mobile: dbCompany.mobile as string | undefined,
+    address: (dbCompany.address as string) || '',
+    houseNumber: dbCompany.house_number as string | undefined,
+    zipCode: (dbCompany.zip_code as string) || '',
+    city: (dbCompany.city as string) || '',
+    province: (dbCompany.province as string) || '',
+    codiceAteco: dbCompany.codice_ateco as string | undefined,
+    notes: dbCompany.notes as string | undefined,
+    status: dbCompany.status as ImpresaEdile['status'],
+    documents: ((dbCompany.documents as Record<string, unknown>[]) || []).map(mapDbDocToDoc),
+    createdAt: dbCompany.created_at as string | undefined,
+  };
+}
+
+function mapCompanyToDbCompany(company: ImpresaEdile): Record<string, unknown> {
+  return {
+    partita_iva: company.partitaIva?.replace(/[\s.\-]/g, '') || '',
+    ragione_sociale: company.ragioneSociale,
+    forma_giuridica: company.formaGiuridica || null,
+    codice_fiscale: company.codiceFiscale || null,
+    codice_rea: company.codiceREA || null,
+    pec: company.pec || null,
+    email: company.email || null,
+    phone: company.phone || null,
+    mobile: company.mobile || null,
+    address: company.address,
+    house_number: company.houseNumber || null,
+    zip_code: company.zipCode,
+    city: company.city,
+    province: company.province,
+    codice_ateco: company.codiceAteco || null,
+    notes: company.notes || null,
+    status: company.status,
+  };
+}
+
+function mapDbDocToDoc(dbDoc: Record<string, unknown>): CompanyDocument {
+  return {
+    id: dbDoc.id as string,
+    name: dbDoc.name as string,
+    issueDate: dbDoc.issue_date as string,
+    expiryDate: dbDoc.expiry_date as string,
+    fileUrl: dbDoc.file_url as string | undefined,
   };
 }
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, ShieldCheck, Settings, LogOut, Menu, UserCircle } from 'lucide-react';
+import { LayoutDashboard, Users, Building2, ShieldCheck, Settings, LogOut, Menu, UserCircle } from 'lucide-react';
 import { Logo } from './Logo';
 import { Role } from '../types';
 
@@ -17,7 +17,8 @@ const Layout: React.FC<LayoutProps> = ({ children, userRole, onLogout, userName 
 
   const navItems = [
     { label: 'Dashboard', path: '/', icon: LayoutDashboard },
-    { label: 'Utenti', path: '/users', icon: Users },
+    { label: 'Lavoratori', path: '/users', icon: Users },
+    { label: 'Imprese Edili', path: '/companies', icon: Building2 },
   ];
 
   if (userRole === Role.ADMIN) {
@@ -97,9 +98,10 @@ const Layout: React.FC<LayoutProps> = ({ children, userRole, onLogout, userName 
               <Menu size={24} />
             </button>
             <h2 className="ml-4 text-xl font-semibold text-gray-800 dark:text-white">
-               {navItems.find(i => i.path === location.pathname)?.label || 
-               (location.pathname === '/settings' ? 'Impostazioni' : 
-               (location.pathname.startsWith('/users') ? 'Gestione Utenti' : 'Gestione'))}
+               {navItems.find(i => i.path === location.pathname)?.label ||
+               (location.pathname === '/settings' ? 'Impostazioni' :
+               (location.pathname.startsWith('/users') ? 'Gestione Lavoratori' :
+               (location.pathname.startsWith('/companies') ? 'Imprese Edili' : 'Gestione')))}
             </h2>
           </div>
           
@@ -119,7 +121,7 @@ const Layout: React.FC<LayoutProps> = ({ children, userRole, onLogout, userName 
           {children}
           
           <footer className="mt-8 py-4 text-center text-xs text-gray-400 border-t border-gray-200 dark:border-gray-700">
-             GestCert &copy; 2026 Cassa Edile Agrigentina - Prodotto e gestito da PC8 srl, Build 1 beta 2
+             GestCert &copy; 2026 Cassa Edile Agrigentina - Prodotto e gestito da PC8 srl, Build 1 beta 5
           </footer>
         </main>
       </div>
