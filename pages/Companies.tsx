@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { ImpresaEdile, CompanyDocument, UserStatus, Role, User } from '../types';
-import { Search, Plus, Upload, Edit, Trash2, Save, X, AlertCircle, FileText, Loader2, CheckCircle, Globe, Eye, Download, Users as UsersIcon, UserPlus, UserMinus } from 'lucide-react';
+import { Search, Plus, Upload, Edit, Trash2, Save, X, AlertCircle, FileText, Loader2, CheckCircle, Globe, Eye, Download, Users as UsersIcon, UserPlus, UserMinus, Lock, Unlock } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import AddressAutocomplete from '../components/AddressAutocomplete';
 import { formatDate } from '../lib/date';
@@ -394,6 +394,18 @@ const LinkedWorkersSection: React.FC<LinkedWorkersSectionProps> = ({ formData, i
     }
   };
 
+  const handleToggleStatus = async (user: User) => {
+    setIsLinking(user.id);
+    try {
+      const newStatus = user.status === UserStatus.ACTIVE ? UserStatus.SUSPENDED : UserStatus.ACTIVE;
+      await updateUser(user.id, { status: newStatus });
+    } catch (err) {
+      console.error('Errore cambio stato lavoratore:', err);
+    } finally {
+      setIsLinking(null);
+    }
+  };
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 p-6">
       <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
@@ -495,7 +507,25 @@ const LinkedWorkersSection: React.FC<LinkedWorkersSectionProps> = ({ formData, i
                           {u.status}
                         </span>
                       </td>
-                      <td className="p-3 text-right">
+                      <td className="p-3 text-right space-x-2">
+                        <button
+                          onClick={() => handleToggleStatus(u)}
+                          disabled={isLinking === u.id}
+                          className={`transition-colors disabled:opacity-50 ${
+                            u.status === UserStatus.ACTIVE
+                              ? 'text-green-500 hover:text-yellow-600 dark:hover:text-yellow-400'
+                              : 'text-yellow-500 hover:text-green-600 dark:hover:text-green-400'
+                          }`}
+                          title={u.status === UserStatus.ACTIVE ? 'Sospendi lavoratore' : 'Riattiva lavoratore'}
+                        >
+                          {isLinking === u.id ? (
+                            <Loader2 size={16} className="animate-spin" />
+                          ) : u.status === UserStatus.ACTIVE ? (
+                            <Lock size={16} />
+                          ) : (
+                            <Unlock size={16} />
+                          )}
+                        </button>
                         <button
                           onClick={() => handleUnlink(u.id)}
                           disabled={isLinking === u.id}
