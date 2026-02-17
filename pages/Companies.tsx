@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { ImpresaEdile, CompanyDocument, UserStatus, Role, User } from '../types';
 import { Search, Plus, Upload, Edit, Trash2, Save, X, AlertCircle, FileText, Loader2, CheckCircle, Globe, Eye, Download, Users as UsersIcon, UserPlus, UserMinus, Lock, Unlock } from 'lucide-react';
 import { jsPDF } from 'jspdf';
@@ -61,11 +62,42 @@ const statusColorMap: Record<string, string> = {
 };
 
 const Companies: React.FC<CompaniesProps> = ({ companies, createCompany, updateCompany, deleteCompany, deleteCompanies, currentUserRole, users, updateUser }) => {
+  const location = useLocation();
   const [view, setView] = useState<'list' | 'edit' | 'create'>('list');
   const [selectedCompany, setSelectedCompany] = useState<ImpresaEdile | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isSaving, setIsSaving] = useState(false);
+  const savingRef = useRef(false);
+  const hasUnsavedRef = useRef(false);
+  const viewRef = useRef<'list' | 'edit' | 'create'>('list');
+  const saveFormRef = useRef<(() => Promise<boolean>) | null>(null);
+
+  // Stato per tracciare modifiche non salvate
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  const pendingLocationKey = useRef<string | null>(null);
+
+  // Keep refs in sync
+  useEffect(() => { hasUnsavedRef.current = hasUnsavedChanges; }, [hasUnsavedChanges]);
+  useEffect(() => { viewRef.current = view; }, [view]);
+  useEffect(() => { savingRef.current = isSaving; }, [isSaving]);
+
+  // Torna alla lista quando si clicca sul menu Imprese Edili
+  useEffect(() => {
+    if (location.pathname === '/companies') {
+      if (!savingRef.current && hasUnsavedRef.current && (viewRef.current === 'edit' || viewRef.current === 'create') && pendingLocationKey.current !== location.key) {
+        pendingLocationKey.current = location.key;
+        setShowUnsavedDialog(true);
+        return;
+      }
+      if (viewRef.current !== 'list' && !hasUnsavedRef.current) {
+        setView('list');
+        setSelectedCompany(null);
+        setHasUnsavedChanges(false);
+      }
+    }
+  }, [location.key, location.pathname]);
 
   // Filter & sort
   const filteredCompanies = useMemo(() => {
@@ -130,6 +162,7 @@ const Companies: React.FC<CompaniesProps> = ({ companies, createCompany, updateC
       } else {
         await updateCompany(company.id, company);
       }
+      setHasUnsavedChanges(false);
       setView('list');
       setSelectedCompany(null);
     } catch (error: unknown) {
@@ -141,6 +174,36 @@ const Companies: React.FC<CompaniesProps> = ({ companies, createCompany, updateC
     } finally {
       setIsSaving(false);
     }
+  };
+
+  // Handler per salvare dal dialog modifiche non salvate
+  const handleSaveFromDialog = async () => {
+    if (isSaving) return;
+    if (saveFormRef.current) {
+      const success = await saveFormRef.current();
+      if (success) {
+        setShowUnsavedDialog(false);
+        pendingLocationKey.current = null;
+      } else {
+        setShowUnsavedDialog(false);
+        pendingLocationKey.current = null;
+      }
+    }
+  };
+
+  // Handler per scartare le modifiche
+  const handleDiscardChanges = () => {
+    setShowUnsavedDialog(false);
+    setHasUnsavedChanges(false);
+    setView('list');
+    setSelectedCompany(null);
+    pendingLocationKey.current = null;
+  };
+
+  // Handler per annullare (resta nel form)
+  const handleCancelDialog = () => {
+    setShowUnsavedDialog(false);
+    pendingLocationKey.current = null;
   };
 
   const handleDelete = async (id: string) => {
@@ -328,15 +391,66 @@ const Companies: React.FC<CompaniesProps> = ({ companies, createCompany, updateC
 
   // ==================== FORM VIEW (create/edit) ====================
   return (
-    <CompanyForm
-      company={selectedCompany!}
-      isCreating={view === 'create'}
-      isSaving={isSaving}
-      onSave={handleSave}
-      onCancel={() => { setView('list'); setSelectedCompany(null); }}
-      users={users}
-      updateUser={updateUser}
-    />
+    <>
+      <CompanyForm
+        company={selectedCompany!}
+        isCreating={view === 'create'}
+        isSaving={isSaving}
+        onSave={handleSave}
+        onCancel={() => {
+          if (!isSaving && hasUnsavedChanges) {
+            setShowUnsavedDialog(true);
+          } else {
+            setSelectedCompany(null);
+            setView('list');
+          }
+        }}
+        users={users}
+        updateUser={updateUser}
+        onFormChange={(_formData, hasChanges) => {
+          setHasUnsavedChanges(hasChanges);
+        }}
+        saveFormRef={saveFormRef}
+      />
+
+      {/* Unsaved Changes Dialog */}
+      {showUnsavedDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full overflow-hidden">
+            <div className="p-4 bg-amber-50 dark:bg-amber-900/30 flex items-center gap-3">
+              <AlertCircle className="text-amber-600 dark:text-amber-400" size={24} />
+              <div>
+                <h3 className="font-bold text-gray-800 dark:text-white">Modifiche non salvate</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                  Ci sono modifiche non salvate. Cosa vuoi fare?
+                </p>
+              </div>
+            </div>
+            <div className="p-4 flex gap-2 justify-end">
+              <button
+                onClick={handleCancelDialog}
+                className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md font-medium transition-colors"
+              >
+                Continua a modificare
+              </button>
+              <button
+                onClick={handleDiscardChanges}
+                className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-md font-medium transition-colors"
+              >
+                Scarta modifiche
+              </button>
+              <button
+                onClick={handleSaveFromDialog}
+                disabled={isSaving}
+                className="px-4 py-2 bg-primary hover:bg-secondary text-white rounded-md font-medium transition-colors flex items-center gap-2"
+              >
+                <Save size={16} /> {isSaving ? 'Salvataggio...' : 'Salva'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 
@@ -563,9 +677,11 @@ interface CompanyFormProps {
   onCancel: () => void;
   users: User[];
   updateUser: (id: string, user: Partial<User>) => Promise<User>;
+  onFormChange?: (formData: ImpresaEdile, hasChanges: boolean) => void;
+  saveFormRef?: React.MutableRefObject<(() => Promise<boolean>) | null>;
 }
 
-const CompanyForm: React.FC<CompanyFormProps> = ({ company, isCreating, isSaving, onSave, onCancel, users, updateUser }) => {
+const CompanyForm: React.FC<CompanyFormProps> = ({ company, isCreating, isSaving, onSave, onCancel, users, updateUser, onFormChange, saveFormRef }) => {
   const [formData, setFormData] = useState<ImpresaEdile>(company);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [viesLoading, setViesLoading] = useState(false);
@@ -630,6 +746,14 @@ const CompanyForm: React.FC<CompanyFormProps> = ({ company, isCreating, isSaving
     }
   };
 
+  // Track form changes and notify parent
+  useEffect(() => {
+    if (onFormChange) {
+      const hasChanges = JSON.stringify(formData) !== JSON.stringify(company);
+      onFormChange(formData, hasChanges);
+    }
+  }, [formData]);
+
   // Validation
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -645,10 +769,23 @@ const CompanyForm: React.FC<CompanyFormProps> = ({ company, isCreating, isSaving
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = () => {
-    if (!validate()) return;
+  const handleSubmit = (): boolean => {
+    if (!validate()) return false;
     onSave(formData);
+    return true;
   };
+
+  // Esponi la funzione di salvataggio al parent tramite ref
+  useEffect(() => {
+    if (saveFormRef) {
+      saveFormRef.current = async () => handleSubmit();
+    }
+    return () => {
+      if (saveFormRef) {
+        saveFormRef.current = null;
+      }
+    };
+  }, [formData, saveFormRef]);
 
   // Document type selection
   const handleDocTypeChange = (value: string) => {
