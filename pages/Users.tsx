@@ -94,6 +94,18 @@ const CSV_HEADER_MAP: Record<string, keyof User | 'ignore'> = {
   'stato': 'status',
 };
 
+const CSV_USER_EXPORT_HEADERS = [
+  'Cognome', 'Nome', 'Email', 'Codice Fiscale', 'Sesso', 'Data Nascita',
+  'Luogo Nascita', 'Paese Nascita', 'Nazionalita', 'Indirizzo', 'N. Civico',
+  'CAP', 'Citta', 'Provincia', 'Telefono', 'Cellulare', 'Gruppo', 'Note', 'Stato',
+];
+
+const CSV_USER_EXPORT_FIELDS: (keyof User)[] = [
+  'lastName', 'firstName', 'email', 'fiscalCode', 'gender', 'birthDate',
+  'birthPlace', 'birthCountry', 'nationality', 'address', 'houseNumber',
+  'zipCode', 'city', 'province', 'phone', 'mobile', 'group', 'notes', 'status',
+];
+
 // Parse status string to UserStatus enum
 function parseStatus(status: string): UserStatus {
   const normalized = status.toLowerCase().trim();
@@ -617,6 +629,41 @@ const Users: React.FC<UsersProps> = ({ users, setUsers, createUser, updateUser, 
     }
   };
 
+  // ============ EXPORT CSV HANDLER ============
+  const handleExportCSV = () => {
+    const dataToExport = filteredUsers;
+    if (dataToExport.length === 0) {
+      alert('Nessun lavoratore da esportare.');
+      return;
+    }
+
+    const csvRows: string[] = [];
+    csvRows.push(CSV_USER_EXPORT_HEADERS.join(';'));
+
+    for (const user of dataToExport) {
+      const row = CSV_USER_EXPORT_FIELDS.map(field => {
+        const value = String((user[field] as string) || '');
+        if (value.includes(';') || value.includes('"') || value.includes('\n')) {
+          return `"${value.replace(/"/g, '""')}"`;
+        }
+        return value;
+      });
+      csvRows.push(row.join(';'));
+    }
+
+    const csvContent = '\uFEFF' + csvRows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const today = new Date().toISOString().split('T')[0];
+    link.href = url;
+    link.download = `lavoratori_${today}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 100);
+  };
+
   if (view === 'list') {
     return (
       <div className="space-y-4">
@@ -703,10 +750,17 @@ const Users: React.FC<UsersProps> = ({ users, setUsers, createUser, updateUser, 
                     <span className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></span>
                   </span>
                 </button>
+                <button
+                  onClick={handleExportCSV}
+                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-md transition-colors text-sm font-medium"
+                  title="Esporta lavoratori in CSV"
+                >
+                  <Download size={18} /> Esporta
+                </button>
               </>
             )}
           </div>
-          
+
           <div className="flex gap-3 items-center flex-1 max-w-2xl">
              <div className="relative flex-1">
                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />

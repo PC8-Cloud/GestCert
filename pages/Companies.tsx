@@ -145,6 +145,7 @@ const Companies: React.FC<CompaniesProps> = ({ companies, createCompany, updateC
   const [view, setView] = useState<'list' | 'edit' | 'create'>('list');
   const [selectedCompany, setSelectedCompany] = useState<ImpresaEdile | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortOrder, setSortOrder] = useState<'ragioneSociale-asc' | 'ragioneSociale-desc' | 'createdAt-asc' | 'createdAt-desc'>('ragioneSociale-asc');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isSaving, setIsSaving] = useState(false);
   const savingRef = useRef(false);
@@ -195,8 +196,21 @@ const Companies: React.FC<CompaniesProps> = ({ companies, createCompany, updateC
         (c.pec || '').toLowerCase().includes(term)
       );
     }
-    return [...result].sort((a, b) => a.ragioneSociale.localeCompare(b.ragioneSociale, 'it'));
-  }, [companies, searchTerm]);
+    return [...result].sort((a, b) => {
+      switch (sortOrder) {
+        case 'ragioneSociale-asc':
+          return a.ragioneSociale.localeCompare(b.ragioneSociale, 'it');
+        case 'ragioneSociale-desc':
+          return b.ragioneSociale.localeCompare(a.ragioneSociale, 'it');
+        case 'createdAt-desc':
+          return (b.createdAt || '').localeCompare(a.createdAt || '');
+        case 'createdAt-asc':
+          return (a.createdAt || '').localeCompare(b.createdAt || '');
+        default:
+          return 0;
+      }
+    });
+  }, [companies, searchTerm, sortOrder]);
 
   const toggleSelectAll = () => {
     if (selectedIds.size === filteredCompanies.length) {
@@ -570,6 +584,16 @@ const Companies: React.FC<CompaniesProps> = ({ companies, createCompany, updateC
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
+            <select
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value as typeof sortOrder)}
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md focus:outline-none focus:ring-2 focus:ring-secondary/50 text-sm"
+            >
+              <option value="ragioneSociale-asc">Ragione Sociale A-Z</option>
+              <option value="ragioneSociale-desc">Ragione Sociale Z-A</option>
+              <option value="createdAt-desc">Più recenti</option>
+              <option value="createdAt-asc">Più vecchi</option>
+            </select>
           </div>
         </div>
 
