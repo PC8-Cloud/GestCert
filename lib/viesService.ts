@@ -1,6 +1,9 @@
 // VIES API Service - EU VAT Number Validation
 // https://ec.europa.eu/taxation_customs/vies/rest-api/
-// Uses Vite dev proxy (/api/vies) to bypass CORS in development.
+// Uses Supabase Edge Function (check-vat) as primary method to bypass CORS.
+// Falls back to Vite dev proxy, then direct call.
+
+import { supabaseUrl, supabaseAnonKey } from './supabase';
 
 export interface ViesResult {
   isValid: boolean;
@@ -20,12 +23,13 @@ interface ViesApiResponse {
 
 /**
  * Parse the VIES address field.
- * Format: "VIA GAETANO NEGRI 1 \n20123 MILANO MI\n"
- * Line 1: street + house number
- * Line 2: ZIP + city + province
+ * Handles multiple formats:
+ *   "VIA GAETANO NEGRI 1 \n20123 MILANO MI\n"
+ *   "VIA NINO BIXIO 41-43, 94015 PIAZZA ARMERINA EN"
  */
 function parseViesAddress(raw: string): { address: string; houseNumber?: string; zipCode: string; city: string; province: string } {
-  const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+  // Normalize: split on newline or comma
+  const lines = raw.split(/[\n,]/).map(l => l.trim()).filter(Boolean);
 
   let address = '';
   let houseNumber: string | undefined;
@@ -36,7 +40,8 @@ function parseViesAddress(raw: string): { address: string; houseNumber?: string;
   if (lines.length >= 1) {
     const streetLine = lines[0];
     const parts = streetLine.split(/\s+/);
-    if (parts.length > 1 && /^\d+[a-zA-Z\/]*$/.test(parts[parts.length - 1])) {
+    // Check if last token looks like a house number (e.g. "1", "41-43", "12A", "5/B")
+    if (parts.length > 1 && /^\d+[a-zA-Z\/\-]*$/.test(parts[parts.length - 1])) {
       houseNumber = parts.pop();
       address = parts.join(' ');
     } else {
@@ -46,6 +51,7 @@ function parseViesAddress(raw: string): { address: string; houseNumber?: string;
 
   if (lines.length >= 2) {
     const locationLine = lines[1];
+    // Try standard format: "20123 MILANO MI"
     const match = locationLine.match(/^(\d{5})\s+(.+?)\s+([A-Z]{2})$/);
     if (match) {
       zipCode = match[1];
@@ -69,9 +75,68 @@ function parseViesAddress(raw: string): { address: string; houseNumber?: string;
 }
 
 /**
+ * Call VIES via Supabase Edge Function (server-side, no CORS issues).
+ */
+async function fetchViaEdgeFunction(cleaned: string): Promise<Response | null> {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.warn('[VIES] Supabase non configurato, skip edge function');
+    return null;
+  }
+
+  try {
+    const resp = await fetch(`${supabaseUrl}/functions/v1/check-vat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseAnonKey}`,
+        'apikey': supabaseAnonKey,
+      },
+      body: JSON.stringify({ countryCode: 'IT', vatNumber: cleaned }),
+    });
+
+    const contentType = resp.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      return resp;
+    }
+    console.warn(`[VIES] Edge function returned non-JSON (${resp.status})`);
+    return null;
+  } catch (err) {
+    console.warn('[VIES] Edge function non raggiungibile:', err);
+    return null;
+  }
+}
+
+/**
+ * Call VIES via Vite dev proxy (dev mode only).
+ */
+async function fetchViaProxy(cleaned: string): Promise<Response | null> {
+  try {
+    const resp = await fetch(`/api/vies/ms/IT/vat/${cleaned}`);
+    const contentType = resp.headers.get('content-type') || '';
+    if (resp.ok && contentType.includes('application/json')) {
+      return resp;
+    }
+    console.warn(`[VIES] Proxy returned ${resp.status} (${contentType})`);
+    return null;
+  } catch {
+    console.warn('[VIES] Proxy non disponibile');
+    return null;
+  }
+}
+
+/**
+ * Call VIES directly (may fail due to CORS in browser).
+ */
+async function fetchDirect(cleaned: string): Promise<Response> {
+  const resp = await fetch(
+    `https://ec.europa.eu/taxation_customs/vies/rest-api/ms/IT/vat/${cleaned}`
+  );
+  return resp;
+}
+
+/**
  * Lookup a Partita IVA using the EU VIES REST API.
- * In dev mode uses Vite proxy (/api/vies) to bypass CORS.
- * In production tries direct call, then falls back to a CORS proxy.
+ * Strategy: Edge Function → Vite proxy → Direct call.
  */
 export async function lookupPartitaIva(piva: string): Promise<ViesResult | null> {
   const cleaned = piva.replace(/[\s.\-]/g, '');
@@ -80,55 +145,54 @@ export async function lookupPartitaIva(piva: string): Promise<ViesResult | null>
     throw new Error('La Partita IVA deve contenere 11 cifre');
   }
 
-  // Use Vite dev proxy to avoid CORS
-  const proxyUrl = `/api/vies/ms/IT/vat/${cleaned}`;
-  const directUrl = `https://ec.europa.eu/taxation_customs/vies/rest-api/ms/IT/vat/${cleaned}`;
+  // Try methods in order: Edge Function → Vite proxy → Direct
+  let response: Response | null = null;
 
-  let response: Response;
+  response = await fetchViaEdgeFunction(cleaned);
 
-  try {
-    // Try proxy first (works in dev with Vite)
-    response = await fetch(proxyUrl);
-  } catch {
-    // Fallback: try direct (may work if CORS is allowed or in production)
+  if (!response) {
+    response = await fetchViaProxy(cleaned);
+  }
+
+  if (!response) {
     try {
-      response = await fetch(directUrl);
+      response = await fetchDirect(cleaned);
     } catch (err) {
-      console.error('[VIES] Errore chiamata API (diretto):', err);
+      console.error('[VIES] Tutti i metodi falliti:', err);
       throw new Error('Impossibile contattare il servizio VIES. Verifica la connessione.');
     }
   }
 
-  try {
-    if (!response.ok) {
-      if (response.status === 404) {
-        return null;
-      }
-      throw new Error(`Errore VIES: ${response.status} ${response.statusText}`);
+  if (!response.ok) {
+    if (response.status === 404 || response.status === 400) {
+      return null;
     }
-
-    const data: ViesApiResponse = await response.json();
-
-    if (!data.isValid) {
-      return { isValid: false, ragioneSociale: '', address: '', zipCode: '', city: '', province: '' };
+    if (response.status >= 500) {
+      throw new Error('Il servizio VIES non è al momento disponibile. Riprova più tardi.');
     }
-
-    const parsed = parseViesAddress(data.address || '');
-
-    return {
-      isValid: true,
-      ragioneSociale: data.name || '',
-      address: parsed.address,
-      houseNumber: parsed.houseNumber,
-      zipCode: parsed.zipCode,
-      city: parsed.city,
-      province: parsed.province,
-    };
-  } catch (err) {
-    if (err instanceof Error && (err.message.startsWith('La Partita IVA') || err.message.startsWith('Errore VIES'))) {
-      throw err;
-    }
-    console.error('[VIES] Errore parsing risposta:', err);
-    throw new Error('Errore nella lettura della risposta VIES.');
+    throw new Error(`Errore VIES: ${response.status} ${response.statusText}`);
   }
+
+  let data: ViesApiResponse;
+  try {
+    data = await response.json();
+  } catch {
+    throw new Error('Errore nella lettura della risposta VIES. Riprova più tardi.');
+  }
+
+  if (!data.isValid) {
+    return { isValid: false, ragioneSociale: '', address: '', zipCode: '', city: '', province: '' };
+  }
+
+  const parsed = parseViesAddress(data.address || '');
+
+  return {
+    isValid: true,
+    ragioneSociale: data.name || '',
+    address: parsed.address,
+    houseNumber: parsed.houseNumber,
+    zipCode: parsed.zipCode,
+    city: parsed.city,
+    province: parsed.province,
+  };
 }
