@@ -713,45 +713,96 @@ const Settings: React.FC<SettingsProps> = ({ settings, setSettings, role, users,
       {/* Import/Export */}
       <section className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 p-6">
         <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-4 flex items-center">
-          <FileSpreadsheet className="mr-2" size={20} /> Import/Export Lavoratori
+          <FileSpreadsheet className="mr-2" size={20} /> Import/Export Dati
         </h2>
-        <div className="space-y-4">
-          <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <Info className="text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" size={20} />
-              <div className="text-sm text-blue-800 dark:text-blue-200">
-                <p className="font-medium mb-1">Come importare lavoratori da Excel</p>
-                <ol className="list-decimal list-inside space-y-1 text-blue-700 dark:text-blue-300">
-                  <li>Scarica il modello CSV qui sotto</li>
-                  <li>Apri il file con Excel o LibreOffice Calc</li>
-                  <li>Compila i dati dei lavoratori (una riga per lavoratore)</li>
-                  <li>Salva il file mantenendo il formato CSV (separatore: punto e virgola)</li>
-                  <li>Vai nella sezione Lavoratori e clicca su "Importa"</li>
-                </ol>
+        <div className="space-y-6">
+          {/* --- Lavoratori --- */}
+          <div>
+            <h3 className="text-md font-semibold text-gray-700 dark:text-gray-200 mb-3">Lavoratori</h3>
+            <div className="space-y-4">
+              <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <Info className="text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" size={20} />
+                  <div className="text-sm text-blue-800 dark:text-blue-200">
+                    <p className="font-medium mb-1">Come importare lavoratori da Excel</p>
+                    <ol className="list-decimal list-inside space-y-1 text-blue-700 dark:text-blue-300">
+                      <li>Scarica il modello CSV qui sotto</li>
+                      <li>Apri il file con Excel o LibreOffice Calc</li>
+                      <li>Compila i dati dei lavoratori (una riga per lavoratore)</li>
+                      <li>Salva il file mantenendo il formato CSV (separatore: punto e virgola)</li>
+                      <li>Vai nella sezione Lavoratori e clicca su "Importa"</li>
+                    </ol>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <div>
+                  <p className="font-medium text-gray-800 dark:text-gray-200">Modello Importazione Lavoratori</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">File CSV con intestazioni e 2 righe di esempio</p>
+                </div>
+                <a
+                  href="/template_importazione_lavoratori.csv"
+                  download="template_importazione_lavoratori.csv"
+                  className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-md transition-colors text-sm font-medium"
+                >
+                  <Download size={18} /> Scarica Modello
+                </a>
+              </div>
+
+              <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
+                <p><strong>Campi obbligatori:</strong> Cognome, Nome, Email, Codice Fiscale, Sesso, Data Nascita</p>
+                <p><strong>Formato data:</strong> AAAA-MM-GG (es. 1980-01-31)</p>
+                <p><strong>Sesso:</strong> M o F</p>
+                <p><strong>Stato:</strong> Attivo, Sospeso, Bloccato</p>
+                <p><strong>Paese/Nazionalità:</strong> Codice ISO a 2 lettere (es. IT, DE, FR)</p>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-            <div>
-              <p className="font-medium text-gray-800 dark:text-gray-200">Modello Importazione Lavoratori</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">File CSV con intestazioni e 2 righe di esempio</p>
-            </div>
-            <a
-              href="/template_importazione_lavoratori.csv"
-              download="template_importazione_lavoratori.csv"
-              className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-md transition-colors text-sm font-medium"
-            >
-              <Download size={18} /> Scarica Modello
-            </a>
-          </div>
+          <hr className="border-gray-200 dark:border-gray-600" />
 
-          <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
-            <p><strong>Campi obbligatori:</strong> Cognome, Nome, Email, Codice Fiscale, Sesso, Data Nascita</p>
-            <p><strong>Formato data:</strong> AAAA-MM-GG (es. 1980-01-31)</p>
-            <p><strong>Sesso:</strong> M o F</p>
-            <p><strong>Stato:</strong> Attivo, Sospeso, Bloccato</p>
-            <p><strong>Paese/Nazionalità:</strong> Codice ISO a 2 lettere (es. IT, DE, FR)</p>
+          {/* --- Imprese Edili --- */}
+          <div>
+            <h3 className="text-md font-semibold text-gray-700 dark:text-gray-200 mb-3">Imprese Edili</h3>
+            <div className="space-y-4">
+              <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <Info className="text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" size={20} />
+                  <div className="text-sm text-blue-800 dark:text-blue-200">
+                    <p className="font-medium mb-1">Come importare imprese da Excel</p>
+                    <ol className="list-decimal list-inside space-y-1 text-blue-700 dark:text-blue-300">
+                      <li>Scarica il modello CSV qui sotto</li>
+                      <li>Apri il file con Excel o LibreOffice Calc</li>
+                      <li>Compila i dati delle imprese (una riga per impresa)</li>
+                      <li>Salva il file mantenendo il formato CSV (separatore: punto e virgola)</li>
+                      <li>Vai nella sezione Imprese Edili e clicca su "Importa"</li>
+                    </ol>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <div>
+                  <p className="font-medium text-gray-800 dark:text-gray-200">Modello Importazione Imprese</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">File CSV con intestazioni e 1 riga di esempio</p>
+                </div>
+                <a
+                  href="/template_importazione_imprese.csv"
+                  download="template_importazione_imprese.csv"
+                  className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-md transition-colors text-sm font-medium"
+                >
+                  <Download size={18} /> Scarica Modello
+                </a>
+              </div>
+
+              <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
+                <p><strong>Campi obbligatori:</strong> Partita IVA, Ragione Sociale</p>
+                <p><strong>Partita IVA:</strong> 11 cifre numeriche (no duplicati)</p>
+                <p><strong>Provincia:</strong> Sigla a 2 lettere (es. TO, MI, RM)</p>
+                <p><strong>Stato:</strong> Attivo, Sospeso, Bloccato (default: Attivo)</p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
