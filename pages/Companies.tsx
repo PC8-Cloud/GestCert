@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { ImpresaEdile, CompanyDocument, UserStatus, Role, User } from '../types';
-import { Search, Plus, Upload, Edit, Trash2, Save, X, AlertCircle, FileText, Loader2, CheckCircle, Globe, Eye, Download, Users as UsersIcon, UserPlus, UserMinus, Lock, Unlock } from 'lucide-react';
+import { Search, Plus, Upload, Edit, Trash2, Save, X, AlertCircle, FileText, Loader2, CheckCircle, Globe, Eye, Download, Users as UsersIcon, UserPlus, UserMinus, Lock, Unlock, XCircle } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import AddressAutocomplete from '../components/AddressAutocomplete';
 import { formatDate } from '../lib/date';
@@ -36,6 +36,85 @@ const FORME_GIURIDICHE = [
   '', 'SRL', 'SRLS', 'SPA', 'SAPA', 'SNC', 'SAS', 'SS',
   'Ditta Individuale', 'Cooperativa', 'Consorzio', 'Altro'
 ];
+
+// ============ CSV IMPORT/EXPORT UTILITIES ============
+
+interface ImportResult {
+  success: boolean;
+  imported: number;
+  errors: { row: number; field: string; message: string }[];
+  skipped: number;
+}
+
+const CSV_COMPANY_HEADER_MAP: Record<string, keyof ImpresaEdile | 'ignore'> = {
+  'partita iva': 'partitaIva',
+  'ragione sociale': 'ragioneSociale',
+  'forma giuridica': 'formaGiuridica',
+  'codice fiscale': 'codiceFiscale',
+  'codice rea': 'codiceREA',
+  'pec': 'pec',
+  'email': 'email',
+  'telefono': 'phone',
+  'cellulare': 'mobile',
+  'indirizzo': 'address',
+  'n. civico': 'houseNumber',
+  'cap': 'zipCode',
+  'citta': 'city',
+  'provincia': 'province',
+  'codice ateco': 'codiceAteco',
+  'note': 'notes',
+  'stato': 'status',
+};
+
+const CSV_EXPORT_HEADERS = [
+  'Partita IVA', 'Ragione Sociale', 'Forma Giuridica', 'Codice Fiscale', 'Codice REA',
+  'PEC', 'Email', 'Telefono', 'Cellulare', 'Indirizzo', 'N. Civico', 'CAP', 'Citta',
+  'Provincia', 'Codice ATECO', 'Note',
+];
+
+const CSV_EXPORT_FIELDS: (keyof ImpresaEdile)[] = [
+  'partitaIva', 'ragioneSociale', 'formaGiuridica', 'codiceFiscale', 'codiceREA',
+  'pec', 'email', 'phone', 'mobile', 'address', 'houseNumber', 'zipCode', 'city',
+  'province', 'codiceAteco', 'notes',
+];
+
+function parseCompanyStatus(status: string): UserStatus {
+  const normalized = status.toLowerCase().trim();
+  if (normalized === 'sospeso') return UserStatus.SUSPENDED;
+  if (normalized === 'bloccato') return UserStatus.LOCKED;
+  return UserStatus.ACTIVE;
+}
+
+function parseCSV(content: string): { headers: string[]; rows: string[][] } {
+  const lines = content.split(/\r?\n/).filter(line => line.trim());
+  if (lines.length === 0) return { headers: [], rows: [] };
+
+  const firstLine = lines[0];
+  const separator = firstLine.includes(';') ? ';' : ',';
+
+  const headers = lines[0].split(separator).map(h => h.trim().toLowerCase());
+  const rows = lines.slice(1).map(line => {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if (char === separator && !inQuotes) {
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    result.push(current.trim());
+    return result;
+  });
+
+  return { headers, rows };
+}
 
 function getDocumentExpiryStatus(expiryDate: string): { color: string; label: string } {
   if (!expiryDate) return { color: 'gray', label: 'N/D' };
@@ -72,6 +151,11 @@ const Companies: React.FC<CompaniesProps> = ({ companies, createCompany, updateC
   const hasUnsavedRef = useRef(false);
   const viewRef = useRef<'list' | 'edit' | 'create'>('list');
   const saveFormRef = useRef<(() => Promise<boolean>) | null>(null);
+
+  // Import CSV state
+  const importFileRef = useRef<HTMLInputElement>(null);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
 
   // Stato per tracciare modifiche non salvate
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -206,6 +290,184 @@ const Companies: React.FC<CompaniesProps> = ({ companies, createCompany, updateC
     pendingLocationKey.current = null;
   };
 
+  // ============ IMPORT CSV HANDLER ============
+  const handleImportCSV = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (importFileRef.current) {
+      importFileRef.current.value = '';
+    }
+
+    setIsImporting(true);
+    setImportResult(null);
+
+    try {
+      const content = await file.text();
+      const { headers, rows } = parseCSV(content);
+
+      if (headers.length === 0 || rows.length === 0) {
+        setImportResult({
+          success: false, imported: 0, skipped: 0,
+          errors: [{ row: 0, field: 'file', message: 'File vuoto o formato non valido' }],
+        });
+        return;
+      }
+
+      const fieldMap: (keyof ImpresaEdile | 'ignore' | null)[] = headers.map(h => CSV_COMPANY_HEADER_MAP[h] || null);
+      const recognizedFields = fieldMap.filter(f => f !== null);
+      if (recognizedFields.length === 0) {
+        setImportResult({
+          success: false, imported: 0, skipped: 0,
+          errors: [{ row: 0, field: 'headers', message: 'Nessuna colonna riconosciuta. Verifica le intestazioni del file.' }],
+        });
+        return;
+      }
+
+      const newCompanies: Omit<ImpresaEdile, 'id'>[] = [];
+      const errors: { row: number; field: string; message: string }[] = [];
+      let skipped = 0;
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const rowNum = i + 2;
+
+        if (row.every(cell => !cell.trim())) {
+          skipped++;
+          continue;
+        }
+
+        const companyData: Record<string, string> = {};
+        let statusValue: UserStatus = UserStatus.ACTIVE;
+
+        for (let j = 0; j < fieldMap.length; j++) {
+          const field = fieldMap[j];
+          const value = row[j]?.trim() || '';
+          if (!field || field === 'ignore') continue;
+
+          if (field === 'status') {
+            statusValue = parseCompanyStatus(value);
+          } else {
+            companyData[field] = value;
+          }
+        }
+
+        let rowHasError = false;
+
+        // Validazione P.IVA: 11 cifre
+        const piva = companyData.partitaIva || '';
+        if (!piva || !/^\d{11}$/.test(piva)) {
+          errors.push({ row: rowNum, field: 'Partita IVA', message: `P.IVA non valida: "${piva}" (deve essere di 11 cifre)` });
+          rowHasError = true;
+        } else {
+          // Duplicato nel file
+          const pivaInFile = newCompanies.some(c => c.partitaIva === piva);
+          if (pivaInFile) {
+            errors.push({ row: rowNum, field: 'Partita IVA', message: `P.IVA duplicata nel file: "${piva}" - riga saltata` });
+            rowHasError = true;
+          }
+          // Duplicato nel DB
+          const pivaInDb = companies.some(c => c.partitaIva === piva);
+          if (pivaInDb) {
+            errors.push({ row: rowNum, field: 'Partita IVA', message: `P.IVA già esistente nel database: "${piva}" - riga saltata` });
+            rowHasError = true;
+          }
+        }
+
+        // Ragione Sociale obbligatoria
+        if (!companyData.ragioneSociale || !companyData.ragioneSociale.trim()) {
+          errors.push({ row: rowNum, field: 'Ragione Sociale', message: 'Ragione Sociale obbligatoria' });
+          rowHasError = true;
+        }
+
+        if (!rowHasError) {
+          newCompanies.push({
+            partitaIva: companyData.partitaIva || '',
+            ragioneSociale: companyData.ragioneSociale || '',
+            formaGiuridica: companyData.formaGiuridica || '',
+            codiceFiscale: companyData.codiceFiscale || '',
+            codiceREA: companyData.codiceREA || '',
+            pec: companyData.pec || '',
+            email: companyData.email || '',
+            phone: companyData.phone || '',
+            mobile: companyData.mobile || '',
+            address: companyData.address || '',
+            houseNumber: companyData.houseNumber || '',
+            zipCode: companyData.zipCode || '',
+            city: companyData.city || '',
+            province: (companyData.province || '').toUpperCase().slice(0, 2),
+            codiceAteco: companyData.codiceAteco || '',
+            notes: companyData.notes || '',
+            status: statusValue,
+            documents: [],
+          });
+        }
+      }
+
+      let importedCount = 0;
+      for (const companyObj of newCompanies) {
+        try {
+          await createCompany(companyObj);
+          importedCount++;
+        } catch (err) {
+          errors.push({ row: 0, field: 'import', message: `Errore creazione "${companyObj.ragioneSociale}": ${err instanceof Error ? err.message : 'Errore'}` });
+        }
+      }
+
+      setImportResult({
+        success: errors.length === 0,
+        imported: importedCount,
+        errors: errors.slice(0, 20),
+        skipped,
+      });
+
+    } catch (err) {
+      console.error('Import error:', err);
+      setImportResult({
+        success: false, imported: 0, skipped: 0,
+        errors: [{ row: 0, field: 'file', message: `Errore nella lettura del file: ${err instanceof Error ? err.message : 'Errore sconosciuto'}` }],
+      });
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  // ============ EXPORT CSV HANDLER ============
+  const handleExportCSV = () => {
+    const dataToExport = filteredCompanies;
+    if (dataToExport.length === 0) {
+      alert('Nessuna impresa da esportare.');
+      return;
+    }
+
+    const csvRows: string[] = [];
+    csvRows.push(CSV_EXPORT_HEADERS.join(';'));
+
+    for (const company of dataToExport) {
+      const row = CSV_EXPORT_FIELDS.map(field => {
+        const value = (company[field] as string) || '';
+        // Escape semicolons and quotes
+        if (value.includes(';') || value.includes('"') || value.includes('\n')) {
+          return `"${value.replace(/"/g, '""')}"`;
+        }
+        return value;
+      });
+      csvRows.push(row.join(';'));
+    }
+
+    const csvContent = '\uFEFF' + csvRows.join('\n'); // BOM for Excel
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const today = new Date().toISOString().split('T')[0];
+    link.href = url;
+    link.download = `imprese_edili_${today}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 100);
+  };
+
   const handleDelete = async (id: string) => {
     if (window.confirm('Sei sicuro di voler eliminare questa impresa?')) {
       try {
@@ -259,9 +521,41 @@ const Companies: React.FC<CompaniesProps> = ({ companies, createCompany, updateC
                 </button>
               </>
             ) : (
-              <button onClick={handleCreate} className="flex items-center gap-2 bg-primary hover:bg-secondary text-white px-4 py-2 rounded-md transition-colors text-sm font-medium">
-                <Plus size={18} /> Nuova Impresa
-              </button>
+              <>
+                <button onClick={handleCreate} className="flex items-center gap-2 bg-primary hover:bg-secondary text-white px-4 py-2 rounded-md transition-colors text-sm font-medium">
+                  <Plus size={18} /> Nuova Impresa
+                </button>
+                {/* Hidden file input for CSV import */}
+                <input
+                  ref={importFileRef}
+                  type="file"
+                  accept=".csv,.txt"
+                  onChange={handleImportCSV}
+                  className="hidden"
+                />
+                <button
+                  onClick={() => importFileRef.current?.click()}
+                  disabled={isImporting}
+                  className="flex items-center gap-2 bg-green-600 hover:bg-green-500 disabled:bg-green-400 text-white px-4 py-2 rounded-md transition-colors text-sm font-medium relative group"
+                  title="Importa imprese da file CSV"
+                >
+                  <Upload size={18} className={isImporting ? 'animate-pulse' : ''} />
+                  {isImporting ? 'Importazione...' : 'Importa'}
+                  <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none z-50">
+                    Importa da CSV
+                    <br />
+                    <span className="text-gray-300">Scarica il modello da Impostazioni</span>
+                    <span className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></span>
+                  </span>
+                </button>
+                <button
+                  onClick={handleExportCSV}
+                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-md transition-colors text-sm font-medium"
+                  title="Esporta imprese in CSV"
+                >
+                  <Download size={18} /> Esporta
+                </button>
+              </>
             )}
           </div>
 
@@ -385,6 +679,72 @@ const Companies: React.FC<CompaniesProps> = ({ companies, createCompany, updateC
             Visualizzate {filteredCompanies.length} imprese
           </div>
         </div>
+
+        {/* Import Results Modal */}
+        {importResult && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-lg w-full max-h-[80vh] overflow-hidden">
+              <div className={`p-4 flex items-center gap-3 ${importResult.imported > 0 ? 'bg-green-50 dark:bg-green-900/30' : 'bg-red-50 dark:bg-red-900/30'}`}>
+                {importResult.imported > 0 ? (
+                  <CheckCircle className="text-green-600 dark:text-green-400" size={24} />
+                ) : (
+                  <XCircle className="text-red-600 dark:text-red-400" size={24} />
+                )}
+                <div>
+                  <h3 className="font-bold text-gray-800 dark:text-white">
+                    {importResult.imported > 0 ? 'Importazione Completata' : 'Importazione Fallita'}
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                    {importResult.imported} imprese importate
+                    {importResult.skipped > 0 && `, ${importResult.skipped} righe vuote ignorate`}
+                  </p>
+                </div>
+              </div>
+
+              {importResult.errors.length > 0 && (
+                <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+                  <h4 className="font-semibold text-red-600 dark:text-red-400 mb-2 flex items-center gap-2">
+                    <AlertCircle size={18} />
+                    Errori riscontrati ({importResult.errors.length})
+                  </h4>
+                  <div className="max-h-60 overflow-y-auto space-y-2">
+                    {importResult.errors.map((err, i) => (
+                      <div key={i} className="text-sm bg-red-50 dark:bg-red-900/20 p-2 rounded border border-red-200 dark:border-red-800">
+                        {err.row > 0 && (
+                          <span className="font-mono text-red-700 dark:text-red-300">Riga {err.row}: </span>
+                        )}
+                        <span className="font-medium text-red-800 dark:text-red-200">{err.field}</span>
+                        <span className="text-red-600 dark:text-red-400"> - {err.message}</span>
+                      </div>
+                    ))}
+                    {importResult.errors.length >= 20 && (
+                      <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                        Mostrati solo i primi 20 errori...
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {importResult.imported > 0 && importResult.errors.length === 0 && (
+                <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+                  <p className="text-green-700 dark:text-green-300 text-sm">
+                    Tutte le imprese sono state importate correttamente.
+                  </p>
+                </div>
+              )}
+
+              <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-end">
+                <button
+                  onClick={() => setImportResult(null)}
+                  className="px-4 py-2 bg-primary hover:bg-secondary text-white rounded-md font-medium transition-colors"
+                >
+                  Chiudi
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
