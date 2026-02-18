@@ -112,7 +112,7 @@ Deno.serve(async (req) => {
     const { data: templates } = await supabase
       .from("email_templates")
       .select("*")
-      .in("key", ["user_expiry", "operator_digest"]);
+      .in("key", ["user_expiry", "operator_digest", "company_expiry"]);
 
     const templateMap = new Map<string, TemplateRow>();
     (templates || []).forEach((t) => templateMap.set(t.key, t as TemplateRow));
@@ -127,6 +127,12 @@ Deno.serve(async (req) => {
       key: "operator_digest",
       subject: "Riepilogo notifiche scadenze",
       body: "Sono stati avvisati:\n\n{{digestList}}"
+    };
+
+    const companyTemplate = templateMap.get("company_expiry") || {
+      key: "company_expiry",
+      subject: "Scadenza documento aziendale",
+      body: 'Gentile {{ragioneSociale}}, il documento "{{documentName}}" depositato presso la Cassa Edile di Agrigento scadrà in data {{expiryDate}}. Vi preghiamo di farci pervenire la copia aggiornata.'
     };
 
     const { data: certs, error: certError } = await supabase
@@ -158,7 +164,28 @@ Deno.serve(async (req) => {
       })
       .filter((x) => x && x.daysUntilExpiry >= 0 && x.daysUntilExpiry <= maxDays);
 
-    if (expiring.length === 0) {
+    // ── Query documenti imprese edili ──
+    const { data: companyDocs } = await supabase
+      .from("company_documents")
+      .select("id, name, expiry_date, companies ( id, ragione_sociale, pec, email )");
+
+    const expiringCompanyDocs = (companyDocs || [])
+      .map((d: any) => {
+        const expiry = d.expiry_date ? new Date(d.expiry_date) : null;
+        if (!expiry || !d.companies) return null;
+        expiry.setHours(0, 0, 0, 0);
+        const diffDays = Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        if (diffDays < 0) return null;
+        if (thresholds.size > 0 && !thresholds.has(diffDays)) return null;
+        return {
+          doc: d,
+          company: d.companies,
+          daysUntilExpiry: diffDays
+        };
+      })
+      .filter((x) => x && x.daysUntilExpiry >= 0 && x.daysUntilExpiry <= maxDays);
+
+    if (expiring.length === 0 && expiringCompanyDocs.length === 0) {
       // Se force=true, invia comunque una mail di test all'operatore
       if (force && settings.operator_email) {
         const transporter = nodemailer.createTransport({
@@ -176,11 +203,11 @@ Deno.serve(async (req) => {
           from: `"${smtp.sender_name}" <${smtp.sender_email}>`,
           to: settings.operator_email,
           subject: "Test Notifiche GestCert",
-          text: "Questa è una mail di test dal sistema GestCert.\n\nLa configurazione SMTP e le notifiche funzionano correttamente.\n\nAttualmente non ci sono certificati in scadenza.",
+          text: "Questa è una mail di test dal sistema GestCert.\n\nLa configurazione SMTP e le notifiche funzionano correttamente.\n\nAttualmente non ci sono certificati o documenti in scadenza.",
           replyTo: smtp.reply_to || undefined
         });
 
-        return new Response(JSON.stringify({ message: "Email di test inviata (nessun certificato in scadenza)", sent: 1 }), { status: 200, headers: corsHeaders });
+        return new Response(JSON.stringify({ message: "Email di test inviata (nessuna scadenza)", sent: 1 }), { status: 200, headers: corsHeaders });
       }
 
       if (settings.daily_digest && !force) {
@@ -189,7 +216,7 @@ Deno.serve(async (req) => {
           .update({ last_sent_date: todayStr })
           .eq("id", NOTIFICATION_SETTINGS_ID);
       }
-      return new Response(JSON.stringify({ message: "Nessun certificato in scadenza", sent: 0 }), { status: 200, headers: corsHeaders });
+      return new Response(JSON.stringify({ message: "Nessuna scadenza trovata", sent: 0 }), { status: 200, headers: corsHeaders });
     }
 
     const byUser = new Map<string, typeof expiring>();
@@ -197,6 +224,13 @@ Deno.serve(async (req) => {
       const list = byUser.get(item.user.id) || [];
       list.push(item);
       byUser.set(item.user.id, list);
+    }
+
+    const byCompany = new Map<string, typeof expiringCompanyDocs>();
+    for (const item of expiringCompanyDocs) {
+      const list = byCompany.get(item.company.id) || [];
+      list.push(item);
+      byCompany.set(item.company.id, list);
     }
 
     const transporter = nodemailer.createTransport({
@@ -213,6 +247,7 @@ Deno.serve(async (req) => {
     let sent = 0;
     const digestLines: string[] = [];
 
+    // ── Notifiche lavoratori ──
     if (settings.notify_users) {
       for (const [, items] of byUser) {
         const user = items[0].user;
@@ -275,6 +310,77 @@ Deno.serve(async (req) => {
           sent++;
           items.forEach((i) => {
             digestLines.push(`L'utente ${user.first_name} ${user.last_name} è stato avvisato che ${i.cert.name} scade il ${formatDate(i.cert.expiry_date)}`);
+          });
+        }
+      }
+    }
+
+    // ── Notifiche imprese edili ──
+    if (settings.notify_users) {
+      for (const [, items] of byCompany) {
+        const company = items[0].company;
+        const companyEmail = company.pec || company.email;
+        if (!companyEmail) {
+          // Anche senza email, aggiungi al digest per l'operatore
+          items.forEach((i) => {
+            digestLines.push(`L'impresa ${company.ragione_sociale} ha il documento "${i.doc.name}" in scadenza il ${formatDate(i.doc.expiry_date)} (nessuna email disponibile)`);
+          });
+          continue;
+        }
+
+        if (items.length === 1) {
+          const item = items[0];
+          const subject = applyTemplate(companyTemplate.subject, {
+            ragioneSociale: company.ragione_sociale,
+            documentName: item.doc.name,
+            expiryDate: formatDate(item.doc.expiry_date),
+            daysUntilExpiry: String(item.daysUntilExpiry),
+            docList: ""
+          });
+          const body = applyTemplate(companyTemplate.body, {
+            ragioneSociale: company.ragione_sociale,
+            documentName: item.doc.name,
+            expiryDate: formatDate(item.doc.expiry_date),
+            daysUntilExpiry: String(item.daysUntilExpiry),
+            docList: ""
+          });
+
+          await transporter.sendMail({
+            from: `"${smtp.sender_name}" <${smtp.sender_email}>`,
+            to: companyEmail,
+            subject,
+            text: body,
+            replyTo: smtp.reply_to || undefined
+          });
+          sent++;
+          digestLines.push(`L'impresa ${company.ragione_sociale} è stata avvisata che il documento "${item.doc.name}" scade il ${formatDate(item.doc.expiry_date)}`);
+        } else {
+          const docList = items.map((i) => `- ${i.doc.name} (scade il ${formatDate(i.doc.expiry_date)})`).join("\n");
+          const subject = applyTemplate(companyTemplate.subject, {
+            ragioneSociale: company.ragione_sociale,
+            documentName: "più documenti",
+            expiryDate: "",
+            daysUntilExpiry: "",
+            docList
+          });
+          const body = applyTemplate(companyTemplate.body, {
+            ragioneSociale: company.ragione_sociale,
+            documentName: "più documenti",
+            expiryDate: "",
+            daysUntilExpiry: "",
+            docList
+          });
+
+          await transporter.sendMail({
+            from: `"${smtp.sender_name}" <${smtp.sender_email}>`,
+            to: companyEmail,
+            subject,
+            text: body,
+            replyTo: smtp.reply_to || undefined
+          });
+          sent++;
+          items.forEach((i) => {
+            digestLines.push(`L'impresa ${company.ragione_sociale} è stata avvisata che il documento "${i.doc.name}" scade il ${formatDate(i.doc.expiry_date)}`);
           });
         }
       }

@@ -1512,7 +1512,7 @@ const Settings: React.FC<SettingsProps> = ({ settings, setSettings, role, users,
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <p className="text-xs font-semibold text-gray-600 dark:text-gray-300">Email lavoratore (certificato in scadenza)</p>
                   <input
@@ -1550,6 +1550,26 @@ const Settings: React.FC<SettingsProps> = ({ settings, setSettings, role, users,
                   />
                   <p className="text-xs text-gray-400">
                     Variabili: {'{{digestList}}'}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-gray-600 dark:text-gray-300">Email impresa edile (documento in scadenza)</p>
+                  <input
+                    type="text"
+                    value={emailTemplates.company_expiry.subject}
+                    onChange={e => handleTemplateChange('company_expiry', 'subject', e.target.value)}
+                    className="w-full p-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded text-sm"
+                    placeholder="Oggetto email impresa"
+                  />
+                  <textarea
+                    value={emailTemplates.company_expiry.body}
+                    onChange={e => handleTemplateChange('company_expiry', 'body', e.target.value)}
+                    className="w-full p-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded text-sm min-h-[120px]"
+                    placeholder="Testo email impresa"
+                  />
+                  <p className="text-xs text-gray-400">
+                    Variabili: {'{{ragioneSociale}}'}, {'{{documentName}}'}, {'{{expiryDate}}'}, {'{{daysUntilExpiry}}'}, {'{{docList}}'}
                   </p>
                 </div>
               </div>

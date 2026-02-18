@@ -11,7 +11,7 @@ export interface NotificationSettings {
 }
 
 export interface EmailTemplate {
-  key: 'user_expiry' | 'operator_digest';
+  key: 'user_expiry' | 'operator_digest' | 'company_expiry';
   subject: string;
   body: string;
 }
@@ -35,6 +35,11 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailTemplate['key'], EmailTemplate
     key: 'operator_digest',
     subject: 'Riepilogo notifiche scadenze',
     body: 'Sono stati avvisati:\n\n{{digestList}}'
+  },
+  company_expiry: {
+    key: 'company_expiry',
+    subject: 'Scadenza documento aziendale',
+    body: 'Gentile {{ragioneSociale}}, il documento "{{documentName}}" depositato presso la Cassa Edile di Agrigento scadrà in data {{expiryDate}}. Vi preghiamo di farci pervenire la copia aggiornata.'
   }
 };
 
@@ -90,16 +95,17 @@ export async function getEmailTemplates(): Promise<Record<EmailTemplate['key'], 
   const { data } = await supabase
     .from('email_templates')
     .select('key, subject, body')
-    .in('key', ['user_expiry', 'operator_digest']);
+    .in('key', ['user_expiry', 'operator_digest', 'company_expiry']);
 
   const templates: Record<EmailTemplate['key'], EmailTemplate> = {
     user_expiry: { ...DEFAULT_EMAIL_TEMPLATES.user_expiry },
-    operator_digest: { ...DEFAULT_EMAIL_TEMPLATES.operator_digest }
+    operator_digest: { ...DEFAULT_EMAIL_TEMPLATES.operator_digest },
+    company_expiry: { ...DEFAULT_EMAIL_TEMPLATES.company_expiry }
   };
 
   if (data) {
     for (const row of data) {
-      if (row.key === 'user_expiry' || row.key === 'operator_digest') {
+      if (row.key === 'user_expiry' || row.key === 'operator_digest' || row.key === 'company_expiry') {
         templates[row.key] = {
           key: row.key,
           subject: row.subject || templates[row.key].subject,
