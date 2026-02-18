@@ -368,7 +368,7 @@ const App: React.FC = () => {
               path="/operators"
               element={userRole === Role.ADMIN ? <Operators operators={operators} createOperator={createOperatorWithLogging} updateOperator={updateOperator} deleteOperator={deleteOperator} /> : <Navigate to="/" />}
             />
-            <Route path="/settings" element={<Settings settings={settings} setSettings={setSettings} role={userRole} users={users} operators={operators} bacheca={bacheca} />} />
+            <Route path="/settings" element={<Settings settings={settings} setSettings={setSettings} role={userRole} users={users} operators={operators} companies={companies} bacheca={bacheca} />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </Layout>

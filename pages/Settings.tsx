@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import JSZip from 'jszip';
-import { AppSettings, Role, User, Certificate, Operator } from '../types';
+import { AppSettings, Role, User, Certificate, Operator, ImpresaEdile } from '../types';
 import { NotaBacheca } from '../lib/hooks';
 import { Layout, Mail, Save, Download, FileSpreadsheet, Info, Award, Plus, Edit, Trash2, X, Check, RotateCcw, Archive, Loader2, Upload, AlertTriangle, Send, Bell, Clock } from 'lucide-react';
 import { useCertificateTypes, CertificateType } from '../lib/hooks';
@@ -28,10 +28,11 @@ interface SettingsProps {
   role: Role;
   users: User[];
   operators: Operator[];
+  companies: ImpresaEdile[];
   bacheca: { note: NotaBacheca[]; loading: boolean; clearAll: () => Promise<void> };
 }
 
-const Settings: React.FC<SettingsProps> = ({ settings, setSettings, role, users, operators, bacheca }) => {
+const Settings: React.FC<SettingsProps> = ({ settings, setSettings, role, users, operators, companies, bacheca }) => {
   // Certificate Types Management
   const certificateTypes = useCertificateTypes();
   const [editingType, setEditingType] = useState<CertificateType | null>(null);
@@ -51,7 +52,7 @@ const Settings: React.FC<SettingsProps> = ({ settings, setSettings, role, users,
   const [restoreProgress, setRestoreProgress] = useState('');
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
   const [pendingRestoreFile, setPendingRestoreFile] = useState<File | null>(null);
-  const [restoreStats, setRestoreStats] = useState<{ users: number; certs: number; date: string } | null>(null);
+  const [restoreStats, setRestoreStats] = useState<{ users: number; certs: number; companies: number; date: string } | null>(null);
   const restoreFileRef = useRef<HTMLInputElement>(null);
 
   // Maintenance state
@@ -97,9 +98,10 @@ const Settings: React.FC<SettingsProps> = ({ settings, setSettings, role, users,
       const backupInfo = manifest.backupInfo || {};
       const usersCount = Array.isArray(manifest.users) ? manifest.users.length : 0;
       const certsCount = manifest.backupInfo?.totalCertificates || 0;
+      const companiesCount = Array.isArray(manifest.companies) ? manifest.companies.length : 0;
       const backupDate = backupInfo.createdAt ? formatDate(backupInfo.createdAt) : 'Sconosciuta';
 
-      setRestoreStats({ users: usersCount, certs: certsCount, date: backupDate });
+      setRestoreStats({ users: usersCount, certs: certsCount, companies: companiesCount, date: backupDate });
       setPendingRestoreFile(file);
       setShowRestoreConfirm(true);
       setRestoreProgress('');
@@ -238,6 +240,10 @@ const Settings: React.FC<SettingsProps> = ({ settings, setSettings, role, users,
         if (manifest.certificateTypes && Array.isArray(manifest.certificateTypes)) {
           setRestoreProgress('Ripristino tipi certificato...');
           localStorage.setItem('gestcert_certificate_types', JSON.stringify(manifest.certificateTypes));
+        }
+        if (manifest.companies && Array.isArray(manifest.companies)) {
+          setRestoreProgress('Ripristino imprese edili...');
+          await restoreServiceExtras.restoreCompanies(manifest.companies);
         }
 
         // Messaggio finale con dettagli
@@ -447,12 +453,16 @@ const Settings: React.FC<SettingsProps> = ({ settings, setSettings, role, users,
       // Tipi certificato - da hook
       backupData.certificateTypes = certificateTypes.types || [];
 
+      // Imprese edili - usa i dati passati come prop (da Supabase)
+      backupData.companies = companies || [];
+
       // Informazioni backup
       backupData.backupInfo = {
         createdAt: new Date().toISOString(),
         version: '1.0',
         totalUsers: users.length,
-        totalCertificates: users.reduce((acc: number, u: User) => acc + (u.certificates?.length || 0), 0)
+        totalCertificates: users.reduce((acc: number, u: User) => acc + (u.certificates?.length || 0), 0),
+        totalCompanies: companies.length
       };
 
       // Salva il manifest JSON principale
@@ -821,6 +831,7 @@ const Settings: React.FC<SettingsProps> = ({ settings, setSettings, role, users,
                 <ul className="list-disc list-inside space-y-1 text-amber-700 dark:text-amber-300">
                   <li>Tutti i lavoratori con i loro dati anagrafici</li>
                   <li>Tutti i certificati e documenti allegati (in PDF)</li>
+                  <li>Tutte le imprese edili con i documenti aziendali</li>
                   <li>Operatori e impostazioni</li>
                   <li>Note bacheca e registro attività</li>
                   <li>Tipi di certificato personalizzati</li>
@@ -958,6 +969,11 @@ const Settings: React.FC<SettingsProps> = ({ settings, setSettings, role, users,
                   <li className="text-gray-700 dark:text-gray-200">
                     <strong>{restoreStats.certs}</strong> certificati
                   </li>
+                  {restoreStats.companies > 0 && (
+                    <li className="text-gray-700 dark:text-gray-200">
+                      <strong>{restoreStats.companies}</strong> imprese edili
+                    </li>
+                  )}
                   <li className="text-gray-500 dark:text-gray-400 text-xs">
                     Data backup: {restoreStats.date}
                   </li>

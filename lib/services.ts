@@ -1547,5 +1547,28 @@ export const restoreServiceExtras = {
         smtp_config: settings.smtp || null
       });
     }
+  },
+
+  async restoreCompanies(companies: ImpresaEdile[]): Promise<void> {
+    if (!companies || companies.length === 0) return;
+    // Cancella tutti i documenti e le imprese esistenti
+    await supabase.from('company_documents').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    await supabase.from('companies').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    // Inserisci ogni impresa con i suoi documenti
+    for (const company of companies) {
+      const dbCompany = mapCompanyToDbCompany(company);
+      const { data } = await supabase.from('companies').insert({ ...dbCompany, id: company.id }).select().single();
+      if (data && company.documents && company.documents.length > 0) {
+        for (const doc of company.documents) {
+          await supabase.from('company_documents').insert({
+            company_id: data.id,
+            name: doc.name,
+            issue_date: doc.issueDate || null,
+            expiry_date: doc.expiryDate,
+            file_url: doc.fileUrl || null
+          });
+        }
+      }
+    }
   }
 };
