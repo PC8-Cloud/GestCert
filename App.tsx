@@ -361,7 +361,7 @@ const App: React.FC = () => {
       <div className={settings.theme === 'dark' ? 'dark' : ''}>
         <Layout userRole={userRole} onLogout={handleLogout} userName={userName}>
           <Routes>
-            <Route path="/" element={<Dashboard user={{ name: userName }} settings={settings} users={users} bacheca={bacheca} activities={activities} currentOperator={currentOperator} />} />
+            <Route path="/" element={<Dashboard user={{ name: userName }} settings={settings} users={users} companies={companies} bacheca={bacheca} activities={activities} currentOperator={currentOperator} />} />
             <Route path="/users" element={<Users users={users} setUsers={setUsersWithLogging} createUser={createUserWithLogging} updateUser={updateUserWithLogging} deleteUser={deleteUserWithLogging} deleteUsers={deleteUsersWithLogging} currentUserRole={userRole} companies={companies} />} />
             <Route path="/companies" element={<Companies companies={companies} createCompany={createCompanyWithLogging} updateCompany={updateCompanyWithLogging} deleteCompany={deleteCompanyWithLogging} deleteCompanies={deleteCompaniesWithLogging} currentUserRole={userRole} users={users} updateUser={updateUserWithLogging} />} />
             <Route

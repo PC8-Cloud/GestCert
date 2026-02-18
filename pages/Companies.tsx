@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { ImpresaEdile, CompanyDocument, UserStatus, Role, User } from '../types';
 import { Search, Plus, Upload, Edit, Trash2, Save, X, AlertCircle, FileText, Loader2, CheckCircle, Globe, Eye, Download, Users as UsersIcon, UserPlus, UserMinus, Lock, Unlock, XCircle } from 'lucide-react';
+import { CertificateFilter } from './Dashboard';
 import { jsPDF } from 'jspdf';
 import AddressAutocomplete from '../components/AddressAutocomplete';
 import { formatDate } from '../lib/date';
@@ -140,8 +141,48 @@ const statusColorMap: Record<string, string> = {
   gray: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
 };
 
+// Helper per filtrare imprese in base alla scadenza documenti (logica cumulativa)
+function getCompaniesWithDocumentFilter(companies: ImpresaEdile[], filter: CertificateFilter): ImpresaEdile[] {
+  if (!filter) return companies;
+
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const weekFromNow = new Date(todayStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const monthFromNow = new Date(todayStart.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+  return companies.filter(company => {
+    const docs = company.documents || [];
+    return docs.some(doc => {
+      if (!doc.expiryDate) return false;
+      const exp = new Date(doc.expiryDate);
+      const expStart = new Date(exp.getFullYear(), exp.getMonth(), exp.getDate());
+
+      switch (filter) {
+        case 'today':
+          return expStart.getTime() === todayStart.getTime();
+        case 'week':
+          return expStart >= todayStart && expStart <= weekFromNow;
+        case 'month':
+          return expStart >= todayStart && expStart <= monthFromNow;
+        case 'expired':
+          return expStart < todayStart;
+        default:
+          return true;
+      }
+    });
+  });
+}
+
+const docFilterLabels: Record<string, string> = {
+  today: 'Scadono Oggi',
+  week: 'Scadono Entro 7 Giorni',
+  month: 'Scadono Entro 30 Giorni',
+  expired: 'Già Scaduti'
+};
+
 const Companies: React.FC<CompaniesProps> = ({ companies, createCompany, updateCompany, deleteCompany, deleteCompanies, currentUserRole, users, updateUser }) => {
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [view, setView] = useState<'list' | 'edit' | 'create'>('list');
   const [selectedCompany, setSelectedCompany] = useState<ImpresaEdile | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -184,9 +225,19 @@ const Companies: React.FC<CompaniesProps> = ({ companies, createCompany, updateC
     }
   }, [location.key, location.pathname]);
 
+  // Filtro documenti da URL
+  const docFilter = searchParams.get('docFilter') as CertificateFilter;
+
+  const clearDocFilter = () => {
+    searchParams.delete('docFilter');
+    setSearchParams(searchParams);
+  };
+
   // Filter & sort
   const filteredCompanies = useMemo(() => {
-    let result = companies;
+    // Prima applica filtro documenti se presente
+    let result = docFilter ? getCompaniesWithDocumentFilter(companies, docFilter) : companies;
+
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       result = result.filter(c =>
@@ -210,7 +261,7 @@ const Companies: React.FC<CompaniesProps> = ({ companies, createCompany, updateC
           return 0;
       }
     });
-  }, [companies, searchTerm, sortOrder]);
+  }, [companies, docFilter, searchTerm, sortOrder]);
 
   const toggleSelectAll = () => {
     if (selectedIds.size === filteredCompanies.length) {
@@ -499,6 +550,27 @@ const Companies: React.FC<CompaniesProps> = ({ companies, createCompany, updateC
   if (view === 'list') {
     return (
       <div className="space-y-4">
+        {/* Filtro documenti attivo */}
+        {docFilter && (
+          <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-lg p-3 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
+              <AlertCircle size={20} />
+              <span className="font-medium">
+                Filtro attivo: <span className="font-bold">{docFilterLabels[docFilter]}</span>
+              </span>
+              <span className="text-amber-600 dark:text-amber-300">
+                ({filteredCompanies.length} imprese trovate)
+              </span>
+            </div>
+            <button
+              onClick={clearDocFilter}
+              className="flex items-center gap-1 bg-amber-200 dark:bg-amber-800 hover:bg-amber-300 dark:hover:bg-amber-700 text-amber-800 dark:text-amber-200 px-3 py-1 rounded-md transition-colors text-sm font-medium"
+            >
+              <X size={16} /> Rimuovi filtro
+            </button>
+          </div>
+        )}
+
         {/* Toolbar */}
         <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 flex flex-wrap gap-4 justify-between items-center">
           <div className="flex gap-2 items-center">

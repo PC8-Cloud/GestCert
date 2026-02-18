@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AppSettings, User, Operator } from '../types';
+import { AppSettings, User, Operator, ImpresaEdile } from '../types';
 import { Calendar as CalendarIcon, Clock, CheckCircle, FileText, ChevronLeft, ChevronRight, MessageSquare, Send, UserPlus, UserCheck, Award, LogIn, Upload, UserMinus, Check } from 'lucide-react';
 import { NotaBacheca, Activity, ActivityType } from '../lib/hooks';
 import { formatDate } from '../lib/date';
@@ -73,6 +73,7 @@ interface DashboardProps {
   user: { name: string };
   settings: AppSettings;
   users: User[];
+  companies: ImpresaEdile[];
   bacheca: BachecaHook;
   activities: ActivitiesHook;
   currentOperator: Operator;
@@ -118,7 +119,7 @@ const formatRelativeTime = (dateStr: string): string => {
   return formatDate(date);
 };
 
-const Dashboard: React.FC<DashboardProps> = ({ user, settings, users, bacheca, activities, currentOperator }) => {
+const Dashboard: React.FC<DashboardProps> = ({ user, settings, users, companies, bacheca, activities, currentOperator }) => {
   const navigate = useNavigate();
   const [time, setTime] = useState(new Date());
   const [calendarDate, setCalendarDate] = useState(new Date());
@@ -128,6 +129,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, settings, users, bacheca, a
   // Naviga alla pagina utenti con filtro certificati
   const goToUsersWithFilter = (filter: CertificateFilter) => {
     navigate(`/users?certFilter=${filter}`);
+  };
+
+  // Naviga alla pagina imprese con filtro documenti
+  const goToCompaniesWithFilter = (filter: CertificateFilter) => {
+    navigate(`/companies?docFilter=${filter}`);
   };
 
   useEffect(() => {
@@ -246,6 +252,34 @@ const Dashboard: React.FC<DashboardProps> = ({ user, settings, users, bacheca, a
     });
   });
 
+  // Conteggio scadenze documenti imprese
+  let compExpiredCount = 0;
+  let compExpiringTodayCount = 0;
+  let compExpiringWeekCount = 0;
+  let compExpiringMonthCount = 0;
+
+  companies.forEach(c => {
+    (c.documents || []).forEach(doc => {
+      if (!doc.expiryDate) return;
+      const exp = new Date(doc.expiryDate);
+      const expStart = new Date(exp.getFullYear(), exp.getMonth(), exp.getDate());
+
+      if (expStart < todayStart) {
+        compExpiredCount++;
+      } else if (expStart <= monthFromNow) {
+        compExpiringMonthCount++;
+
+        if (expStart <= weekFromNow) {
+          compExpiringWeekCount++;
+
+          if (expStart.getTime() === todayStart.getTime()) {
+            compExpiringTodayCount++;
+          }
+        }
+      }
+    });
+  });
+
 
   return (
     <div className="space-y-6">
@@ -351,10 +385,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, settings, users, bacheca, a
           <div className="col-span-1 md:col-span-2 bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
              <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-4 flex items-center">
                <FileText className="mr-2 text-primary" size={20} />
-               Stato Scadenze Certificati
+               Stato Scadenze
              </h3>
-             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
 
+             {/* Certificati Lavoratori */}
+             <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Certificati Lavoratori</p>
+             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                <div
                  onClick={() => goToUsersWithFilter('today')}
                  className="bg-red-50 p-4 rounded-lg border border-red-100 text-center cursor-pointer hover:bg-red-100 hover:scale-105 transition-all"
@@ -362,7 +398,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, settings, users, bacheca, a
                   <div className="text-3xl font-bold text-red-600">{expiringTodayCount}</div>
                   <div className="text-xs font-semibold text-red-800 uppercase tracking-wide mt-1">Oggi</div>
                </div>
-
                <div
                  onClick={() => goToUsersWithFilter('week')}
                  className="bg-orange-50 p-4 rounded-lg border border-orange-100 text-center cursor-pointer hover:bg-orange-100 hover:scale-105 transition-all"
@@ -370,7 +405,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, settings, users, bacheca, a
                   <div className="text-3xl font-bold text-orange-600">{expiringWeekCount}</div>
                   <div className="text-xs font-semibold text-orange-800 uppercase tracking-wide mt-1">Entro 7 giorni</div>
                </div>
-
                <div
                  onClick={() => goToUsersWithFilter('month')}
                  className="bg-yellow-50 p-4 rounded-lg border border-yellow-100 text-center cursor-pointer hover:bg-yellow-100 hover:scale-105 transition-all"
@@ -378,7 +412,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, settings, users, bacheca, a
                   <div className="text-3xl font-bold text-yellow-600">{expiringMonthCount}</div>
                   <div className="text-xs font-semibold text-yellow-800 uppercase tracking-wide mt-1">Entro 30 giorni</div>
                </div>
-
                <div
                  onClick={() => goToUsersWithFilter('expired')}
                  className="bg-gray-100 p-4 rounded-lg border border-gray-200 text-center cursor-pointer hover:bg-gray-200 hover:scale-105 transition-all"
@@ -386,7 +419,39 @@ const Dashboard: React.FC<DashboardProps> = ({ user, settings, users, bacheca, a
                   <div className="text-3xl font-bold text-gray-600">{expiredCount}</div>
                   <div className="text-xs font-semibold text-gray-800 uppercase tracking-wide mt-1">Già Scaduti</div>
                </div>
+             </div>
 
+             {/* Documenti Imprese */}
+             <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2 mt-5">Documenti Imprese</p>
+             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+               <div
+                 onClick={() => goToCompaniesWithFilter('today')}
+                 className="bg-red-50 p-4 rounded-lg border border-red-100 text-center cursor-pointer hover:bg-red-100 hover:scale-105 transition-all"
+               >
+                  <div className="text-3xl font-bold text-red-600">{compExpiringTodayCount}</div>
+                  <div className="text-xs font-semibold text-red-800 uppercase tracking-wide mt-1">Oggi</div>
+               </div>
+               <div
+                 onClick={() => goToCompaniesWithFilter('week')}
+                 className="bg-orange-50 p-4 rounded-lg border border-orange-100 text-center cursor-pointer hover:bg-orange-100 hover:scale-105 transition-all"
+               >
+                  <div className="text-3xl font-bold text-orange-600">{compExpiringWeekCount}</div>
+                  <div className="text-xs font-semibold text-orange-800 uppercase tracking-wide mt-1">Entro 7 giorni</div>
+               </div>
+               <div
+                 onClick={() => goToCompaniesWithFilter('month')}
+                 className="bg-yellow-50 p-4 rounded-lg border border-yellow-100 text-center cursor-pointer hover:bg-yellow-100 hover:scale-105 transition-all"
+               >
+                  <div className="text-3xl font-bold text-yellow-600">{compExpiringMonthCount}</div>
+                  <div className="text-xs font-semibold text-yellow-800 uppercase tracking-wide mt-1">Entro 30 giorni</div>
+               </div>
+               <div
+                 onClick={() => goToCompaniesWithFilter('expired')}
+                 className="bg-gray-100 p-4 rounded-lg border border-gray-200 text-center cursor-pointer hover:bg-gray-200 hover:scale-105 transition-all"
+               >
+                  <div className="text-3xl font-bold text-gray-600">{compExpiredCount}</div>
+                  <div className="text-xs font-semibold text-gray-800 uppercase tracking-wide mt-1">Già Scaduti</div>
+               </div>
              </div>
           </div>
         )}
