@@ -26,6 +26,38 @@ const bachecaApi = STORAGE_MODE === 'local' ? localBachecaService : bachecaServi
 const companiesApi = STORAGE_MODE === 'local' ? localCompaniesService : companiesService;
 const activitiesApi = localActivitiesService; // Sempre locale per semplicità
 
+// ============ AUTO-REFRESH HOOK ============
+// Polling periodico + refetch quando la tab torna visibile
+
+const AUTO_REFRESH_INTERVAL = 30 * 1000; // 30 secondi
+
+function useAutoRefresh(fetchFn: () => Promise<void>, enabled: boolean = true) {
+  const fetchRef = useRef(fetchFn);
+  fetchRef.current = fetchFn;
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    // Polling periodico
+    const interval = setInterval(() => {
+      fetchRef.current().catch(() => {});
+    }, AUTO_REFRESH_INTERVAL);
+
+    // Refetch quando la tab torna visibile
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchRef.current().catch(() => {});
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [enabled]);
+}
+
 // ============ USERS HOOK ============
 
 export function useUsers() {
@@ -47,9 +79,19 @@ export function useUsers() {
     }
   }, []);
 
+  // Refresh silenzioso (senza loading spinner)
+  const silentRefresh = useCallback(async () => {
+    try {
+      const data = await usersApi.getAll();
+      setUsers(data);
+    } catch {}
+  }, []);
+
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
+
+  useAutoRefresh(silentRefresh);
 
   const createUser = async (user: Omit<User, 'id'>, skipEmailCheck?: boolean) => {
     try {
@@ -127,9 +169,18 @@ export function useCompanies() {
     }
   }, []);
 
+  const silentRefresh = useCallback(async () => {
+    try {
+      const data = await companiesApi.getAll();
+      setCompanies(data);
+    } catch {}
+  }, []);
+
   useEffect(() => {
     fetchCompanies();
   }, [fetchCompanies]);
+
+  useAutoRefresh(silentRefresh);
 
   const createCompany = async (company: Omit<ImpresaEdile, 'id'>) => {
     try {
@@ -206,9 +257,18 @@ export function useOperators() {
     }
   }, []);
 
+  const silentRefresh = useCallback(async () => {
+    try {
+      const data = await operatorsApi.getAll();
+      setOperators(data);
+    } catch {}
+  }, []);
+
   useEffect(() => {
     fetchOperators();
   }, [fetchOperators]);
+
+  useAutoRefresh(silentRefresh);
 
   const createOperator = async (operator: Omit<Operator, 'id'> & { password?: string }) => {
     try {
@@ -255,8 +315,17 @@ export function useOperators() {
 
 // ============ AUTH HOOK ============
 
+const SESSION_KEY = 'gestcert_session';
+
 export function useAuth() {
-  const [currentOperator, setCurrentOperator] = useState<Operator | null>(null);
+  const [currentOperator, setCurrentOperator] = useState<Operator | null>(() => {
+    try {
+      const saved = sessionStorage.getItem(SESSION_KEY);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -325,6 +394,7 @@ export function useAuth() {
       }
 
       setCurrentOperator(operator);
+      try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(operator)); } catch {}
       console.log('[auth] login done');
       return operator;
     } catch (err) {
@@ -339,6 +409,7 @@ export function useAuth() {
   const logout = () => {
     supabase.auth.signOut();
     setCurrentOperator(null);
+    try { sessionStorage.removeItem(SESSION_KEY); } catch {}
   };
 
   return {
