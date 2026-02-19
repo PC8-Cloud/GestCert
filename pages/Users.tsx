@@ -696,8 +696,7 @@ const Users: React.FC<UsersProps> = ({ users, setUsers, createUser, updateUser, 
                 <span className="text-sm text-gray-600 dark:text-gray-300 font-medium">
                   {selectedIds.size} selezionati
                 </span>
-                {currentUserRole === Role.ADMIN && (
-                  <button
+                <button
                     onClick={async () => {
                       if (window.confirm(`Eliminare ${selectedIds.size} lavoratori selezionati?`)) {
                         try {
@@ -713,7 +712,6 @@ const Users: React.FC<UsersProps> = ({ users, setUsers, createUser, updateUser, 
                   >
                     <Trash2 size={18} /> Elimina
                   </button>
-                )}
                 <button
                   onClick={() => setSelectedIds(new Set())}
                   className="flex items-center gap-2 bg-gray-500 hover:bg-gray-400 text-white px-4 py-2 rounded-md transition-colors text-sm font-medium"
@@ -875,11 +873,9 @@ const Users: React.FC<UsersProps> = ({ users, setUsers, createUser, updateUser, 
                     <button onClick={() => handleEdit(user)} className="text-gray-400 hover:text-blue-600" title="Modifica">
                       <Edit size={18} />
                     </button>
-                    {currentUserRole === Role.ADMIN && (
-                      <button onClick={() => handleDelete(user.id)} className="text-gray-400 hover:text-red-600" title="Elimina">
-                        <Trash2 size={18} />
-                      </button>
-                    )}
+                    <button onClick={() => handleDelete(user.id)} className="text-gray-400 hover:text-red-600" title="Elimina">
+                      <Trash2 size={18} />
+                    </button>
                   </td>
                 </tr>
               ))}
